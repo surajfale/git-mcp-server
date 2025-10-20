@@ -207,7 +207,9 @@
 - [-] 10. Implement configuration management for multi-mode deployment
 
 
-  - [-] 10.1 Create configuration module in `config.py`
+  - [x] 10.1 Create configuration module in `config.py`
+
+
 
     - Write `ServerConfig` dataclass with all configuration fields (transport, HTTP, auth, TLS, repository, monitoring)
     - Implement `from_env()` class method to load configuration from environment variables
@@ -215,27 +217,54 @@
     - Support loading from `.env` file using python-dotenv
     - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5_
   
-  - [ ]* 10.2 Write unit tests for configuration
+  - [x] 10.2 Write unit tests for configuration
+
+
+
+
+
+
+
+
+
+
     - Create `tests/test_config.py` with tests for environment variable loading
     - Test configuration validation and error handling
     - _Requirements: 7.1, 7.5_
 
-- [ ] 11. Implement authentication and security layer
-  - [ ] 11.1 Create authentication module in `auth.py`
+- [x] 11. Implement authentication and security layer
+
+
+
+
+  - [x] 11.1 Create authentication module in `auth.py`
+
+
     - Write `TokenValidator` class for bearer token validation
     - Implement JWT token support with expiration checking
     - Write `verify_token()` function for FastAPI dependency injection
     - Add rate limiting logic (token bucket algorithm)
     - _Requirements: 6.3, 6.4_
   
-  - [ ]* 11.2 Write unit tests for authentication
+  - [x] 11.2 Write unit tests for authentication
+
+
+
+
+
+
     - Create `tests/test_auth.py` with tests for token validation
     - Test JWT token generation and verification
     - Test rate limiting behavior
     - _Requirements: 6.3, 6.4_
+-
 
 - [ ] 12. Implement Repository Manager for remote Git access
-  - [ ] 12.1 Create RepositoryManager class in `repository_manager.py`
+
+  - [x] 12.1 Create RepositoryManager class in `repository_manager.py`
+
+
+
     - Write `get_or_clone_repository()` method to clone repos to workspace
     - Implement `get_local_repository()` method for existing local repos
     - Write `cleanup_workspace()` method to remove cloned repos
@@ -244,7 +273,11 @@
     - Implement workspace locking for concurrent access control
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
   
-  - [ ]* 12.2 Write unit tests for RepositoryManager
+  - [-] 12.2 Write unit tests for RepositoryManager
+
+
+
+
     - Create `tests/test_repository_manager.py` with mocked Git operations
     - Test repository cloning with SSH and HTTPS
     - Test workspace cleanup and locking
