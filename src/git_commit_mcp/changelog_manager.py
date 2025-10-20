@@ -59,8 +59,8 @@ All notable changes to this project will be documented in this file.
         timestamp, short commit hash, push status, and full commit message.
         
         Args:
-            commit_hash: Full commit hash
-            commit_message: Complete commit message
+            commit_hash: Full commit hash or placeholder (e.g., "pending")
+            commit_message: Complete commit message (can be empty for placeholder)
             pushed: Whether the commit was pushed to remote
             repo_path: Path to the Git repository
             
@@ -148,6 +148,47 @@ All notable changes to this project will be documented in this file.
             
         except (IOError, OSError) as e:
             raise IOError(f"Failed to replace commit hash in changelog: {e}")
+    
+    def update_commit_message_in_changelog(
+        self,
+        commit_hash: str,
+        commit_message: str,
+        repo_path: str
+    ) -> None:
+        """Update the commit message for a specific commit in the changelog.
+        
+        This is used when the commit message is generated after the changelog entry
+        is created with a placeholder.
+        
+        Args:
+            commit_hash: Commit hash to find (short or full)
+            commit_message: The commit message to insert
+            repo_path: Path to the Git repository
+            
+        Raises:
+            IOError: If file operations fail
+        """
+        changelog_path = Path(repo_path) / self.changelog_file
+        
+        if not changelog_path.exists():
+            return
+        
+        try:
+            content = changelog_path.read_text(encoding='utf-8')
+            short_hash = commit_hash[:7]
+            
+            # Find the entry with this hash and add the commit message after it
+            # Look for pattern: ### YYYY-MM-DD HH:MM:SS - HASH [STATUS]\n\n
+            import re
+            pattern = rf"(### \d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}:\d{{2}} - {short_hash} \[(?:LOCAL|PUSHED)\])\n\n"
+            replacement = rf"\1\n\n{commit_message}"
+            
+            updated_content = re.sub(pattern, replacement, content)
+            
+            changelog_path.write_text(updated_content, encoding='utf-8')
+            
+        except (IOError, OSError) as e:
+            raise IOError(f"Failed to update commit message in changelog: {e}")
     
     def _format_entry(
         self,

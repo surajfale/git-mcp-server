@@ -215,19 +215,39 @@ def execute_git_commit_and_push(
             result.message = result.error
             return result.__dict__
         
-        # Step 3: Stage changes
+        # Step 3: Update changelog with placeholder hash BEFORE committing
+        # This way CHANGELOG.md will be included in the same commit
+        placeholder_hash = "0000000"
+        try:
+            changelog_mgr.update_changelog(
+                commit_hash=placeholder_hash,
+                commit_message=commit_message,
+                pushed=False,
+                repo_path=str(repo_path)
+            )
+        except IOError as e:
+            # Changelog update failure is not critical, continue
+            logger.warning("Failed to update changelog", extra={"error": str(e)})
+        
+        # Step 4: Stage changes (including CHANGELOG.md)
         try:
             git_ops.stage_changes(repo, changes)
+            
+            # Also stage CHANGELOG.md if it was updated
+            changelog_path = repo_path / config.changelog_file
+            if changelog_path.exists():
+                repo.index.add([config.changelog_file])
         except (GitCommandError, InvalidGitRepositoryError) as e:
             result.error = f"Failed to stage changes: {e.stderr if hasattr(e, 'stderr') else str(e)}"
             result.message = result.error
             return result.__dict__
         
-        # Step 4: Create commit
+        # Step 5: Create commit
         try:
             logger.info("Creating commit", extra={"files_changed": result.files_changed})
             commit_hash = git_ops.create_commit(repo, commit_message)
             result.commit_hash = commit_hash
+            result.changelog_updated = True
             logger.info(
                 "Commit created successfully",
                 extra={"commit_hash": commit_hash, "files_changed": result.files_changed}
@@ -238,14 +258,41 @@ def execute_git_commit_and_push(
             logger.error("Failed to create commit", extra={"error": result.error})
             return result.__dict__
         
-        # Step 5: Handle push (if confirmed)
+        # Step 6: Update CHANGELOG with actual commit hash (amend the commit)
+        try:
+            changelog_mgr.replace_commit_hash(
+                old_hash=placeholder_hash,
+                new_hash=commit_hash,
+                repo_path=str(repo_path),
+                pushed=False
+            )
+            # Amend the commit to include the updated CHANGELOG
+            repo.index.add([config.changelog_file])
+            repo.git.commit('--amend', '--no-edit')
+        except (IOError, GitCommandError) as e:
+            # Not critical if this fails
+            logger.warning("Failed to update changelog with commit hash", extra={"error": str(e)})
+        
+        # Step 7: Handle push (if confirmed)
         if confirm_push:
             try:
                 logger.info("Pushing to remote", extra={"commit_hash": commit_hash})
                 push_result = git_ops.push_to_remote(repo)
                 result.pushed = push_result["success"]
                 result.message = push_result["message"]
+                
+                # Update CHANGELOG push status if push succeeded
                 if result.pushed:
+                    try:
+                        changelog_mgr.replace_commit_hash(
+                            old_hash=commit_hash[:7],
+                            new_hash=commit_hash,
+                            repo_path=str(repo_path),
+                            pushed=True
+                        )
+                    except IOError as e:
+                        logger.warning("Failed to update changelog push status", extra={"error": str(e)})
+                    
                     logger.info(
                         "Push completed successfully",
                         extra={"commit_hash": commit_hash, "branch": push_result.get("branch")}
@@ -265,37 +312,6 @@ def execute_git_commit_and_push(
             result.pushed = False
             result.message = f"Commit created successfully (not pushed)"
             logger.info("Push skipped (not confirmed)", extra={"commit_hash": commit_hash})
-        
-        # Step 6: Update changelog with actual commit info and create a second commit for it
-        try:
-            changelog_mgr.update_changelog(
-                commit_hash=commit_hash,
-                commit_message=commit_message,
-                pushed=result.pushed,
-                repo_path=str(repo_path)
-            )
-            result.changelog_updated = True
-            
-            # Stage and commit the changelog update
-            changelog_path = repo_path / config.changelog_file
-            if changelog_path.exists():
-                # Add the changelog file to the index
-                repo.index.add([config.changelog_file])
-                
-                # Check if there are actually changes to commit
-                if repo.index.diff("HEAD"):
-                    # Create a second commit for the changelog
-                    changelog_commit_msg = f"docs: Update CHANGELOG.md for commit {commit_hash[:7]}"
-                    repo.index.commit(changelog_commit_msg)
-                    
-                    # Push the changelog commit if original was pushed
-                    if result.pushed:
-                        git_ops.push_to_remote(repo)
-                        
-        except (IOError, GitCommandError) as e:
-            # Changelog update failure is not critical
-            result.changelog_updated = False
-            result.message += f" (Warning: Failed to update changelog: {str(e)})"
         
         # Mark as successful
         result.success = True

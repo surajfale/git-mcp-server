@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 13:42:00 - f842713 [LOCAL]
+### 2025-10-20 13:49:20 - 4704493 [LOCAL]
+
+chore(git-commit-mcp): Update configuration
+
+- Add test_commit.py
+- Update changelog_manager.py
+- Update server.py### 2025-10-20 13:42:00 - f842713 [LOCAL]
 
 test(.kiro): Update tests
 
