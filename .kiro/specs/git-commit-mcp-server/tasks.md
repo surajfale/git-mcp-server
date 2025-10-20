@@ -195,8 +195,6 @@
     - _Requirements: All requirements_
 - [x] 9. Integration testing and validation
 
-- [x] 9. Integration testing and validation
-
 
 
 
@@ -205,3 +203,191 @@
   - Test complete workflow: make changes → invoke tool → verify commit → verify changelog
   - Test MCP protocol compliance
   - _Requirements: All requirements_
+
+- [-] 10. Implement configuration management for multi-mode deployment
+
+
+  - [-] 10.1 Create configuration module in `config.py`
+
+    - Write `ServerConfig` dataclass with all configuration fields (transport, HTTP, auth, TLS, repository, monitoring)
+    - Implement `from_env()` class method to load configuration from environment variables
+    - Add validation logic for configuration values (e.g., port ranges, file paths)
+    - Support loading from `.env` file using python-dotenv
+    - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5_
+  
+  - [ ]* 10.2 Write unit tests for configuration
+    - Create `tests/test_config.py` with tests for environment variable loading
+    - Test configuration validation and error handling
+    - _Requirements: 7.1, 7.5_
+
+- [ ] 11. Implement authentication and security layer
+  - [ ] 11.1 Create authentication module in `auth.py`
+    - Write `TokenValidator` class for bearer token validation
+    - Implement JWT token support with expiration checking
+    - Write `verify_token()` function for FastAPI dependency injection
+    - Add rate limiting logic (token bucket algorithm)
+    - _Requirements: 6.3, 6.4_
+  
+  - [ ]* 11.2 Write unit tests for authentication
+    - Create `tests/test_auth.py` with tests for token validation
+    - Test JWT token generation and verification
+    - Test rate limiting behavior
+    - _Requirements: 6.3, 6.4_
+
+- [ ] 12. Implement Repository Manager for remote Git access
+  - [ ] 12.1 Create RepositoryManager class in `repository_manager.py`
+    - Write `get_or_clone_repository()` method to clone repos to workspace
+    - Implement `get_local_repository()` method for existing local repos
+    - Write `cleanup_workspace()` method to remove cloned repos
+    - Implement `configure_ssh_key()` method for SSH authentication setup
+    - Add support for HTTPS authentication with username/password and tokens
+    - Implement workspace locking for concurrent access control
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+  
+  - [ ]* 12.2 Write unit tests for RepositoryManager
+    - Create `tests/test_repository_manager.py` with mocked Git operations
+    - Test repository cloning with SSH and HTTPS
+    - Test workspace cleanup and locking
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+
+- [ ] 13. Implement HTTP/SSE transport layer
+  - [ ] 13.1 Create HTTP server in `http_server.py`
+    - Initialize FastAPI application with CORS middleware
+    - Implement `/health` endpoint for health checks
+    - Implement `/mcp/tools/git_commit_and_push` POST endpoint with authentication
+    - Implement `/mcp/sse` GET endpoint for Server-Sent Events
+    - Add error handling middleware for consistent error responses
+    - Integrate authentication dependency on protected endpoints
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.2, 7.3, 7.4, 9.2, 9.3, 9.5_
+  
+  - [ ] 13.2 Create transport abstraction in `transport.py`
+    - Write `TransportHandler` base class for transport abstraction
+    - Implement `StdioTransport` class for local mode
+    - Implement `HttpTransport` class for remote mode
+    - Add transport factory function to select appropriate transport
+    - _Requirements: 6.1, 6.2, 6.5_
+  
+  - [ ]* 13.3 Write integration tests for HTTP server
+    - Create `tests/test_http_server.py` with httpx test client
+    - Test health check endpoint
+    - Test authenticated and unauthenticated requests
+    - Test CORS headers
+    - Test SSE connection
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.2, 7.3_
+
+- [ ] 14. Update main server to support dual-mode operation
+  - [ ] 14.1 Refactor `server.py` for stdio mode
+    - Extract core tool logic into reusable functions
+    - Keep FastMCP integration for stdio transport
+    - Ensure server can run independently in stdio mode
+    - _Requirements: 6.5_
+  
+  - [ ] 14.2 Create unified entry point in `__main__.py`
+    - Write `main()` function that reads configuration
+    - Implement mode selection logic (stdio vs http)
+    - Call appropriate server runner based on transport mode
+    - Add logging setup and error handling
+    - _Requirements: 6.1, 6.5, 7.1, 7.5, 9.3_
+  
+  - [ ] 14.3 Update tool implementation to work with both transports
+    - Modify `git_commit_and_push` to work with RepositoryManager
+    - Add support for remote repository URLs in addition to local paths
+    - Ensure error handling works consistently across transports
+    - _Requirements: 6.1, 6.5, 8.1, 8.5_
+
+- [ ] 15. Create Docker containerization
+  - [ ] 15.1 Write Dockerfile
+    - Create multi-stage Dockerfile with Python 3.11 slim base
+    - Install system dependencies (git, openssh-client)
+    - Copy application code and install Python dependencies
+    - Create non-root user for security
+    - Set environment variables and expose port 8000
+    - Define CMD to run server in HTTP mode
+    - _Requirements: 9.1_
+  
+  - [ ] 15.2 Create docker-compose.yml
+    - Define service configuration for local testing
+    - Add environment variables for configuration
+    - Mount volumes for SSH keys and workspace
+    - Configure port mapping and restart policy
+    - _Requirements: 9.1_
+  
+  - [ ] 15.3 Create .env.example file
+    - Document all environment variables with descriptions
+    - Provide example values for each configuration option
+    - Include comments explaining usage
+    - _Requirements: 7.1_
+
+- [ ] 16. Create deployment configurations
+  - [ ] 16.1 Create Kubernetes manifests in `deployment/kubernetes/`
+    - Write `deployment.yaml` with container spec, resource limits, and environment variables
+    - Write `service.yaml` for load balancer configuration
+    - Write `ingress.yaml` for external access with TLS
+    - Create `secrets.yaml.example` for sensitive configuration
+    - _Requirements: 9.1, 9.2, 9.4_
+  
+  - [ ] 16.2 Create Cloud Run configuration in `deployment/cloud-run/`
+    - Write `service.yaml` for Cloud Run deployment
+    - Document deployment commands in README
+    - _Requirements: 9.1, 9.2, 9.4_
+  
+  - [ ] 16.3 Create systemd service in `deployment/systemd/`
+    - Write `git-commit-mcp.service` unit file
+    - Document installation and setup instructions
+    - _Requirements: 9.1_
+
+- [ ] 17. Update documentation for remote hosting
+  - [ ] 17.1 Update README.md with deployment guides
+    - Add "Deployment" section with overview of options
+    - Document Docker deployment with examples
+    - Document Cloud Run deployment steps
+    - Document Kubernetes deployment steps
+    - Document VPS deployment with systemd
+    - Add client configuration examples for both modes
+    - _Requirements: All remote hosting requirements_
+  
+  - [ ] 17.2 Create deployment troubleshooting guide
+    - Document common deployment issues and solutions
+    - Add authentication troubleshooting steps
+    - Include network and firewall configuration tips
+    - _Requirements: 6.3, 6.4, 7.5, 8.4_
+  
+  - [ ]* 17.3 Add API documentation
+    - Document HTTP endpoints with request/response examples
+    - Add authentication header format
+    - Include error response formats
+    - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ]* 18. Add monitoring and observability
+  - [ ]* 18.1 Implement metrics endpoint
+    - Add `/metrics` endpoint with Prometheus-compatible metrics
+    - Track request counts, latencies, and error rates
+    - Track Git operation metrics (commits, pushes, failures)
+    - _Requirements: 9.5_
+  
+  - [ ]* 18.2 Enhance logging
+    - Add structured logging with JSON format
+    - Include request IDs for tracing
+    - Log all Git operations with outcomes
+    - Add audit logging for security events
+    - _Requirements: 9.3_
+
+- [ ]* 19. Performance optimization and testing
+  - [ ]* 19.1 Implement repository caching
+    - Add caching layer for cloned repositories
+    - Implement TTL-based cache eviction
+    - Add cache warming for frequently accessed repos
+    - _Requirements: 8.5, 9.4_
+  
+  - [ ]* 19.2 Add load testing
+    - Create load test scripts using locust or k6
+    - Test concurrent client connections
+    - Measure performance under load
+    - _Requirements: 7.4_
+  
+  - [ ]* 19.3 Add end-to-end remote deployment tests
+    - Test Docker container deployment
+    - Test authentication flow
+    - Test remote repository access
+    - Verify health checks and metrics
+    - _Requirements: All remote hosting requirements_

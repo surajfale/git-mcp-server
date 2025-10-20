@@ -7,7 +7,8 @@ from git.exc import GitCommandError, InvalidGitRepositoryError
 
 from fastmcp import FastMCP
 
-from git_commit_mcp.models import CommitResult, ServerConfig
+from git_commit_mcp.models import CommitResult
+from git_commit_mcp.config import ServerConfig
 from git_commit_mcp.change_tracker import ChangeTracker
 from git_commit_mcp.message_generator import CommitMessageGenerator
 from git_commit_mcp.git_operations import GitOperationsManager
@@ -16,7 +17,7 @@ from git_commit_mcp.changelog_manager import ChangelogManager
 # Initialize FastMCP server
 mcp = FastMCP("git-commit-server")
 
-# Initialize configuration
+# Initialize configuration (can be overridden by loading from environment)
 config = ServerConfig()
 
 

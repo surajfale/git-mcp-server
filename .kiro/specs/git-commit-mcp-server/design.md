@@ -4,18 +4,23 @@
 
 The Git Commit MCP Server is a Model Context Protocol server that provides automated Git commit workflow tools. It exposes MCP tools that can be invoked by AI assistants to track changes, generate conventional commit messages, create commits, manage push operations with user approval, and maintain a changelog.
 
-The server will be implemented as a standalone MCP server using Python, leveraging the FastMCP framework for rapid development and the GitPython library for Git operations.
+The server supports two deployment modes:
+1. **Local Mode (stdio)**: Runs locally and communicates via standard input/output
+2. **Remote Mode (HTTP/SSE)**: Runs as a web service accessible over the network with authentication
+
+The server will be implemented using Python, leveraging the FastMCP framework for rapid development, GitPython for Git operations, and supporting multiple transport protocols for flexible deployment.
 
 ## Architecture
 
 ### High-Level Architecture
 
+#### Local Mode (stdio)
 ```
 ┌─────────────────┐
 │   AI Assistant  │
 │   (MCP Client)  │
 └────────┬────────┘
-         │ MCP Protocol
+         │ stdio
          │
 ┌────────▼────────────────────────────────┐
 │     Git Commit MCP Server               │
@@ -40,14 +45,175 @@ The server will be implemented as a standalone MCP server using Python, leveragi
      └─────────────────┘
 ```
 
+#### Remote Mode (HTTP/SSE)
+```
+┌─────────────────┐       ┌─────────────────┐
+│   AI Assistant  │       │   AI Assistant  │
+│   (MCP Client)  │       │   (MCP Client)  │
+└────────┬────────┘       └────────┬────────┘
+         │                         │
+         │ HTTP/SSE + Auth Token   │
+         │                         │
+         └────────┬────────────────┘
+                  │
+         ┌────────▼────────┐
+         │  Load Balancer  │ (Optional)
+         │   / Reverse     │
+         │     Proxy       │
+         └────────┬────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+┌───▼───┐    ┌───▼───┐    ┌───▼───┐
+│Server │    │Server │    │Server │
+│   1   │    │   2   │    │   N   │
+└───┬───┘    └───┬───┘    └───┬───┘
+    │            │            │
+┌───▼────────────▼────────────▼───┐
+│  Git Commit MCP Server          │
+│  ┌──────────────────────────┐   │
+│  │  Transport Layer         │   │
+│  │  - HTTP/SSE Handler      │   │
+│  │  - Authentication        │   │
+│  │  - CORS Handler          │   │
+│  └──────────┬───────────────┘   │
+│             │                    │
+│  ┌──────────▼───────────────┐   │
+│  │  MCP Tool Interface      │   │
+│  │  - git_commit_and_push   │   │
+│  └──────────┬───────────────┘   │
+│             │                    │
+│  ┌──────────▼───────────────┐   │
+│  │  Core Components         │   │
+│  │  - Change Tracker        │   │
+│  │  - Message Generator     │   │
+│  │  - Git Operations Mgr    │   │
+│  │  - Changelog Manager     │   │
+│  │  - Repository Manager    │   │
+│  └──────────┬───────────────┘   │
+└─────────────┼──────────────────┘
+              │
+     ┌────────▼────────┐
+     │  Git Repository │
+     │  - Local Clone  │
+     │  - SSH/HTTPS    │
+     │  - CHANGELOG.md │
+     └─────────────────┘
+```
+
 ### Technology Stack
 
 - **Language**: Python 3.10+
 - **MCP Framework**: FastMCP (for rapid MCP server development)
 - **Git Library**: GitPython (for Git operations)
+- **Web Framework**: FastAPI (for HTTP/SSE transport in remote mode)
+- **Authentication**: JWT tokens or API keys
+- **Containerization**: Docker (for cloud deployment)
 - **Packaging**: uv/uvx for distribution
 
+### Deployment Options
+
+#### 1. Cloud Run / ECS / Azure Container Instances
+- **Best for**: Auto-scaling, managed infrastructure
+- **Pros**: No server management, automatic scaling, pay-per-use
+- **Cons**: Cold start latency, stateless (requires external storage)
+- **Setup**: Docker container + environment variables
+
+#### 2. AWS Lambda / Google Cloud Functions / Azure Functions
+- **Best for**: Serverless, event-driven workloads
+- **Pros**: Zero infrastructure management, extreme cost efficiency
+- **Cons**: Execution time limits, cold starts, complex Git operations
+- **Setup**: Function handler + layer for dependencies
+
+#### 3. Traditional VPS (DigitalOcean, Linode, AWS EC2)
+- **Best for**: Full control, persistent storage
+- **Pros**: Persistent state, no cold starts, full control
+- **Cons**: Manual scaling, server management required
+- **Setup**: systemd service + nginx reverse proxy
+
+#### 4. Kubernetes
+- **Best for**: Large-scale deployments, multi-tenant
+- **Pros**: Advanced orchestration, auto-scaling, high availability
+- **Cons**: Complex setup, overkill for small deployments
+- **Setup**: Deployment + Service + Ingress
+
 ## Components and Interfaces
+
+### 0. Transport Layer (New for Remote Mode)
+
+**Responsibility:** Handle HTTP/SSE communication, authentication, and CORS for remote deployments.
+
+**Interface:**
+```python
+class TransportHandler:
+    def __init__(self, auth_token: str, cors_origins: List[str]):
+        """Initialize transport with authentication and CORS settings."""
+        pass
+    
+    def authenticate_request(self, request: Request) -> bool:
+        """Validate authentication token from request headers."""
+        pass
+    
+    def handle_sse_connection(self, request: Request) -> EventSourceResponse:
+        """Handle Server-Sent Events connection for streaming."""
+        pass
+    
+    def health_check(self) -> dict:
+        """Return health status for load balancer checks."""
+        pass
+```
+
+**FastAPI Integration:**
+```python
+from fastapi import FastAPI, Header, HTTPException
+from sse_starlette.sse import EventSourceResponse
+
+app = FastAPI()
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "version": "1.0.0"}
+
+@app.post("/mcp/tools/git_commit_and_push")
+async def git_commit_and_push_endpoint(
+    repository_path: str = ".",
+    confirm_push: bool = False,
+    authorization: str = Header(None)
+):
+    # Validate token
+    if not validate_token(authorization):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Execute tool
+    result = await execute_git_commit_and_push(repository_path, confirm_push)
+    return result
+
+@app.get("/mcp/sse")
+async def sse_endpoint(authorization: str = Header(None)):
+    # Validate token and stream events
+    if not validate_token(authorization):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    return EventSourceResponse(event_generator())
+```
+
+**Authentication Mechanisms:**
+1. **API Key**: Simple bearer token in Authorization header
+2. **JWT**: Signed tokens with expiration
+3. **OAuth 2.0**: For enterprise integrations (future)
+
+**CORS Configuration:**
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://trusted-client.com"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+```
 
 ### 1. MCP Tool Interface
 
@@ -266,6 +432,57 @@ This gives the AI assistant control over when to push, allowing it to ask the us
 **Recommended Design:**
 Use a single tool with a `confirm_push` parameter that the AI assistant must explicitly set to `true` after asking the user.
 
+### 7. Repository Manager (New for Remote Mode)
+
+**Responsibility:** Manage Git repository access for remote deployments, including cloning, authentication, and cleanup.
+
+**Interface:**
+```python
+class RepositoryManager:
+    def __init__(self, workspace_dir: str = "/tmp/git-workspaces"):
+        """Initialize with workspace directory for cloned repos."""
+        pass
+    
+    def get_or_clone_repository(
+        self, 
+        repo_url: str, 
+        credentials: Optional[GitCredentials] = None
+    ) -> Repo:
+        """Clone repository if not exists, or pull latest changes."""
+        pass
+    
+    def get_local_repository(self, repo_path: str) -> Repo:
+        """Access existing local repository."""
+        pass
+    
+    def cleanup_workspace(self, repo_id: str) -> None:
+        """Remove cloned repository from workspace."""
+        pass
+    
+    def configure_ssh_key(self, private_key: str) -> None:
+        """Configure SSH key for Git operations."""
+        pass
+```
+
+**GitCredentials Data Structure:**
+```python
+@dataclass
+class GitCredentials:
+    auth_type: Literal["ssh", "https", "token"]
+    username: Optional[str] = None
+    password: Optional[str] = None
+    ssh_key: Optional[str] = None
+    token: Optional[str] = None
+```
+
+**Implementation Details:**
+- For remote mode, clone repositories to `/tmp/git-workspaces/{repo_hash}/`
+- Support SSH key-based authentication via environment variables or mounted secrets
+- Support HTTPS with username/password or personal access tokens
+- Implement workspace cleanup after operations complete
+- Cache cloned repositories for performance (with TTL)
+- Handle concurrent access with file locking
+
 ## Data Models
 
 ### Configuration
@@ -273,10 +490,58 @@ Use a single tool with a `confirm_push` parameter that the AI assistant must exp
 ```python
 @dataclass
 class ServerConfig:
+    # Core settings
     default_repo_path: str = "."
     max_bullet_points: int = 5
     max_summary_lines: int = 2
     changelog_file: str = "CHANGELOG.md"
+    
+    # Transport settings
+    transport_mode: Literal["stdio", "http"] = "stdio"
+    http_host: str = "0.0.0.0"
+    http_port: int = 8000
+    
+    # Authentication settings
+    auth_enabled: bool = True
+    auth_token: Optional[str] = None  # Read from env: MCP_AUTH_TOKEN
+    
+    # CORS settings
+    cors_enabled: bool = True
+    cors_origins: List[str] = field(default_factory=lambda: ["*"])
+    
+    # TLS/HTTPS settings
+    tls_enabled: bool = False
+    tls_cert_path: Optional[str] = None
+    tls_key_path: Optional[str] = None
+    
+    # Repository settings (for remote mode)
+    workspace_dir: str = "/tmp/git-workspaces"
+    ssh_key_path: Optional[str] = None  # Read from env: GIT_SSH_KEY_PATH
+    git_username: Optional[str] = None
+    git_token: Optional[str] = None
+    
+    # Monitoring settings
+    enable_metrics: bool = True
+    log_level: str = "INFO"
+    
+    @classmethod
+    def from_env(cls) -> "ServerConfig":
+        """Load configuration from environment variables."""
+        return cls(
+            transport_mode=os.getenv("TRANSPORT_MODE", "stdio"),
+            http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
+            http_port=int(os.getenv("HTTP_PORT", "8000")),
+            auth_token=os.getenv("MCP_AUTH_TOKEN"),
+            cors_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+            tls_enabled=os.getenv("TLS_ENABLED", "false").lower() == "true",
+            tls_cert_path=os.getenv("TLS_CERT_PATH"),
+            tls_key_path=os.getenv("TLS_KEY_PATH"),
+            workspace_dir=os.getenv("WORKSPACE_DIR", "/tmp/git-workspaces"),
+            ssh_key_path=os.getenv("GIT_SSH_KEY_PATH"),
+            git_username=os.getenv("GIT_USERNAME"),
+            git_token=os.getenv("GIT_TOKEN"),
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
+        )
 ```
 
 ### Response Models
@@ -325,6 +590,22 @@ class CommitResult:
 7. **Changelog Update Fails**
    - Detection: IOError or PermissionError
    - Response: Log warning, continue (non-critical failure)
+
+8. **Authentication Failure (Remote Mode)**
+   - Detection: Missing or invalid auth token in request
+   - Response: HTTP 401 Unauthorized with error message
+
+9. **Repository Clone Fails (Remote Mode)**
+   - Detection: GitCommandError during clone operation
+   - Response: Return error with repository URL and authentication hint
+
+10. **Workspace Full (Remote Mode)**
+    - Detection: Disk space check before clone
+    - Response: Return error suggesting cleanup or storage expansion
+
+11. **Concurrent Access Conflict (Remote Mode)**
+    - Detection: File lock acquisition failure
+    - Response: Return error suggesting retry after delay
 
 ### Error Response Format
 
@@ -395,6 +676,21 @@ class CommitResult:
 dependencies = [
     "fastmcp>=0.1.0",
     "gitpython>=3.1.0",
+    "fastapi>=0.104.0",  # For HTTP/SSE transport
+    "uvicorn>=0.24.0",   # ASGI server
+    "sse-starlette>=1.6.0",  # Server-Sent Events
+    "pyjwt>=2.8.0",      # JWT authentication
+    "python-multipart>=0.0.6",  # Form data parsing
+    "pydantic>=2.0.0",   # Data validation
+    "python-dotenv>=1.0.0",  # Environment variable loading
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.25.0",  # For testing HTTP endpoints
+    "pytest-cov>=4.1.0",
 ]
 ```
 
@@ -405,23 +701,44 @@ git-commit-mcp-server/
 ├── src/
 │   └── git_commit_mcp/
 │       ├── __init__.py
-│       ├── server.py           # Main MCP server
+│       ├── server.py              # Main MCP server (stdio mode)
+│       ├── http_server.py         # HTTP/SSE server (remote mode)
+│       ├── transport.py           # Transport layer abstraction
+│       ├── auth.py                # Authentication handlers
 │       ├── change_tracker.py
 │       ├── message_generator.py
 │       ├── git_operations.py
 │       ├── changelog_manager.py
-│       └── models.py
+│       ├── repository_manager.py  # Repository access for remote mode
+│       ├── models.py
+│       └── config.py              # Configuration management
 ├── tests/
 │   ├── test_change_tracker.py
 │   ├── test_message_generator.py
 │   ├── test_git_operations.py
-│   └── test_changelog_manager.py
+│   ├── test_changelog_manager.py
+│   ├── test_repository_manager.py
+│   ├── test_http_server.py
+│   └── test_auth.py
+├── deployment/
+│   ├── Dockerfile                 # Container image
+│   ├── docker-compose.yml         # Local testing
+│   ├── kubernetes/
+│   │   ├── deployment.yaml
+│   │   ├── service.yaml
+│   │   └── ingress.yaml
+│   ├── cloud-run/
+│   │   └── service.yaml
+│   └── systemd/
+│       └── git-commit-mcp.service
+├── .env.example                   # Environment variable template
 ├── pyproject.toml
 └── README.md
 ```
 
-### FastMCP Server Setup
+### Server Setup
 
+#### Local Mode (stdio)
 ```python
 from fastmcp import FastMCP
 
@@ -437,14 +754,310 @@ def git_commit_and_push(
     """
     # Implementation
     pass
+
+if __name__ == "__main__":
+    mcp.run()  # Uses stdio transport
+```
+
+#### Remote Mode (HTTP/SSE)
+```python
+from fastapi import FastAPI, Header, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
+import uvicorn
+
+app = FastAPI(title="Git Commit MCP Server")
+
+# Load configuration
+config = ServerConfig.from_env()
+
+# Add CORS middleware
+if config.cors_enabled:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+
+# Authentication dependency
+async def verify_token(authorization: str = Header(None)):
+    if config.auth_enabled:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid token")
+        token = authorization.replace("Bearer ", "")
+        if token != config.auth_token:
+            raise HTTPException(status_code=401, detail="Invalid authentication token")
+    return True
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "transport": "http",
+        "auth_enabled": config.auth_enabled
+    }
+
+@app.post("/mcp/tools/git_commit_and_push")
+async def git_commit_and_push_endpoint(
+    repository_path: str = ".",
+    confirm_push: bool = False,
+    authenticated: bool = Depends(verify_token)
+):
+    """Execute git commit and push operation."""
+    try:
+        result = await execute_git_commit_and_push(repository_path, confirm_push)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/mcp/sse")
+async def sse_endpoint(authenticated: bool = Depends(verify_token)):
+    """Server-Sent Events endpoint for streaming updates."""
+    async def event_generator():
+        # Stream events to client
+        yield {"event": "connected", "data": "MCP Server Ready"}
+    
+    return EventSourceResponse(event_generator())
+
+if __name__ == "__main__":
+    if config.tls_enabled:
+        uvicorn.run(
+            app,
+            host=config.http_host,
+            port=config.http_port,
+            ssl_certfile=config.tls_cert_path,
+            ssl_keyfile=config.tls_key_path,
+        )
+    else:
+        uvicorn.run(
+            app,
+            host=config.http_host,
+            port=config.http_port,
+        )
+```
+
+#### Unified Entry Point
+```python
+# src/git_commit_mcp/__main__.py
+import sys
+from .config import ServerConfig
+from .server import run_stdio_server
+from .http_server import run_http_server
+
+def main():
+    config = ServerConfig.from_env()
+    
+    if config.transport_mode == "stdio":
+        run_stdio_server()
+    elif config.transport_mode == "http":
+        run_http_server(config)
+    else:
+        print(f"Unknown transport mode: {config.transport_mode}", file=sys.stderr)
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 ```
 
 ## Security Considerations
 
+### Local Mode
 1. **Path Traversal**: Validate `repository_path` to prevent access outside intended directories
 2. **Command Injection**: Use GitPython's API exclusively, avoid shell commands
 3. **Credential Exposure**: Never log or return Git credentials
 4. **File Permissions**: Respect file system permissions when writing CHANGELOG.md
+
+### Remote Mode (Additional)
+5. **Authentication**: Require valid bearer tokens for all API requests
+6. **TLS/HTTPS**: Enforce HTTPS in production to encrypt data in transit
+7. **Rate Limiting**: Implement rate limiting to prevent abuse (e.g., 100 requests/minute per token)
+8. **Input Validation**: Sanitize all inputs (repository URLs, paths, commit messages)
+9. **Secret Management**: Store sensitive credentials (SSH keys, tokens) in environment variables or secret managers
+10. **CORS Policy**: Restrict CORS origins to trusted domains only
+11. **Workspace Isolation**: Ensure cloned repositories are isolated per user/session
+12. **Audit Logging**: Log all operations with timestamps, user identifiers, and outcomes
+13. **Token Rotation**: Support token expiration and rotation for long-lived deployments
+14. **Network Security**: Deploy behind firewall/VPC with restricted ingress rules
+15. **Container Security**: Run containers as non-root user, scan images for vulnerabilities
+
+## Deployment Examples
+
+### Docker Deployment
+```dockerfile
+# Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
+
+# Create non-root user
+RUN useradd -m -u 1000 mcpuser && chown -R mcpuser:mcpuser /app
+USER mcpuser
+
+# Expose port
+EXPOSE 8000
+
+# Set environment
+ENV TRANSPORT_MODE=http
+ENV HTTP_PORT=8000
+
+# Run server
+CMD ["python", "-m", "git_commit_mcp"]
+```
+
+### Docker Compose
+```yaml
+version: '3.8'
+services:
+  git-commit-mcp:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - TRANSPORT_MODE=http
+      - HTTP_HOST=0.0.0.0
+      - HTTP_PORT=8000
+      - MCP_AUTH_TOKEN=${MCP_AUTH_TOKEN}
+      - GIT_SSH_KEY_PATH=/secrets/ssh_key
+      - CORS_ORIGINS=https://myapp.com
+    volumes:
+      - ./secrets:/secrets:ro
+      - git-workspaces:/tmp/git-workspaces
+    restart: unless-stopped
+
+volumes:
+  git-workspaces:
+```
+
+### Cloud Run Deployment
+```bash
+# Build and push image
+docker build -t gcr.io/my-project/git-commit-mcp:latest .
+docker push gcr.io/my-project/git-commit-mcp:latest
+
+# Deploy to Cloud Run
+gcloud run deploy git-commit-mcp \
+  --image gcr.io/my-project/git-commit-mcp:latest \
+  --platform managed \
+  --region us-central1 \
+  --set-env-vars TRANSPORT_MODE=http,MCP_AUTH_TOKEN=secret123 \
+  --allow-unauthenticated \
+  --port 8000
+```
+
+### Kubernetes Deployment
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: git-commit-mcp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: git-commit-mcp
+  template:
+    metadata:
+      labels:
+        app: git-commit-mcp
+    spec:
+      containers:
+      - name: server
+        image: git-commit-mcp:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: TRANSPORT_MODE
+          value: "http"
+        - name: MCP_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mcp-secrets
+              key: auth-token
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: git-commit-mcp
+spec:
+  selector:
+    app: git-commit-mcp
+  ports:
+  - port: 80
+    targetPort: 8000
+  type: LoadBalancer
+```
+
+### Systemd Service (VPS)
+```ini
+[Unit]
+Description=Git Commit MCP Server
+After=network.target
+
+[Service]
+Type=simple
+User=mcpuser
+WorkingDirectory=/opt/git-commit-mcp
+Environment="TRANSPORT_MODE=http"
+Environment="HTTP_PORT=8000"
+Environment="MCP_AUTH_TOKEN=your-secret-token"
+ExecStart=/opt/git-commit-mcp/.venv/bin/python -m git_commit_mcp
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## Client Configuration
+
+### Local Mode (stdio)
+```json
+{
+  "mcpServers": {
+    "git-commit": {
+      "command": "uvx",
+      "args": ["git-commit-mcp-server"]
+    }
+  }
+}
+```
+
+### Remote Mode (HTTP)
+```json
+{
+  "mcpServers": {
+    "git-commit-remote": {
+      "url": "https://mcp.example.com",
+      "transport": "http",
+      "headers": {
+        "Authorization": "Bearer your-secret-token"
+      }
+    }
+  }
+}
+```
 
 ## Future Enhancements
 
@@ -454,3 +1067,9 @@ def git_commit_and_push(
 4. Support for semantic versioning in changelog
 5. Pre-commit hooks integration
 6. Support for multiple remotes
+7. WebSocket transport for bidirectional communication
+8. Multi-tenancy with per-user workspaces
+9. Repository caching and incremental updates
+10. Webhook support for CI/CD integration
+11. GraphQL API for advanced queries
+12. Metrics and observability dashboard

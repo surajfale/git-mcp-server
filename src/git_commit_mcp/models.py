@@ -76,17 +76,4 @@ class CommitResult:
     error: Optional[str] = None
 
 
-@dataclass
-class ServerConfig:
-    """Configuration settings for the MCP server.
-    
-    Attributes:
-        default_repo_path: Default path to Git repository
-        max_bullet_points: Maximum number of bullet points in commit messages
-        max_summary_lines: Maximum number of lines in commit summary
-        changelog_file: Name of the changelog file to maintain
-    """
-    default_repo_path: str = "."
-    max_bullet_points: int = 5
-    max_summary_lines: int = 2
-    changelog_file: str = "CHANGELOG.md"
+# ServerConfig has been moved to config.py for comprehensive configuration management
