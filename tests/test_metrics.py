@@ -124,7 +124,7 @@ class TestMetricsCollector:
         text = collector.generate_prometheus_text()
         assert "http_requests_total" in text
         assert "git_commits_total" in text
-        assert "server_health" in text
+        assert "git_commit_mcp_health" in text
     
     def test_register_and_increment_counter(self):
         """Test registering and incrementing a counter."""
