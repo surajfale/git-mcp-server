@@ -206,19 +206,19 @@ class MetricsCollector:
         
         # Server metrics
         self.register_gauge(
-            "server_info",
-            "Server information",
+            "git_commit_mcp_info",
+            "Git Commit MCP Server information",
             labels={"version": "1.0.0"}
         )
         
         self.register_gauge(
-            "server_health",
-            "Server health status (1 = healthy, 0 = unhealthy)"
+            "git_commit_mcp_health",
+            "Git Commit MCP Server health status (1 = healthy, 0 = unhealthy)"
         )
         
         # Set initial values
-        self.set_gauge("server_info", 1.0, labels={"version": "1.0.0"})
-        self.set_gauge("server_health", 1.0)
+        self.set_gauge("git_commit_mcp_info", 1.0, labels={"version": "1.0.0"})
+        self.set_gauge("git_commit_mcp_health", 1.0)
     
     def register_counter(self, name: str, help_text: str, labels: Optional[Dict[str, str]] = None) -> None:
         """Register a new counter metric.
