@@ -100,9 +100,11 @@ def execute_git_commit_and_push(
         
         result.files_changed = changes.total_files()
         
-        # Step 2: Generate commit message
+        # Step 2: Generate commit message (exclude CHANGELOG.md from message)
         try:
-            commit_message = message_generator.generate_message(changes, repo)
+            # Filter out CHANGELOG.md for message generation since it's auto-updated
+            changes_for_message = changes.exclude_file(config.changelog_file)
+            commit_message = message_generator.generate_message(changes_for_message, repo)
             result.commit_message = commit_message
         except Exception as e:
             result.error = f"Failed to generate commit message: {str(e)}"
@@ -145,7 +147,7 @@ def execute_git_commit_and_push(
             result.pushed = False
             result.message = f"Commit created successfully (not pushed)"
         
-        # Step 6: Update changelog
+        # Step 6: Update changelog with actual commit info and create a second commit for it
         try:
             changelog_mgr.update_changelog(
                 commit_hash=commit_hash,
@@ -154,10 +156,26 @@ def execute_git_commit_and_push(
                 repo_path=str(repo_path)
             )
             result.changelog_updated = True
-        except IOError as e:
+            
+            # Stage and commit the changelog update
+            changelog_path = repo_path / config.changelog_file
+            if changelog_path.exists():
+                # Add the changelog file to the index
+                repo.index.add([config.changelog_file])
+                
+                # Check if there are actually changes to commit
+                if repo.index.diff("HEAD"):
+                    # Create a second commit for the changelog
+                    changelog_commit_msg = f"docs: Update CHANGELOG.md for commit {commit_hash[:7]}"
+                    repo.index.commit(changelog_commit_msg)
+                    
+                    # Push the changelog commit if original was pushed
+                    if result.pushed:
+                        git_ops.push_to_remote(repo)
+                        
+        except (IOError, GitCommandError) as e:
             # Changelog update failure is not critical
             result.changelog_updated = False
-            # Append warning to message
             result.message += f" (Warning: Failed to update changelog: {str(e)})"
         
         # Mark as successful

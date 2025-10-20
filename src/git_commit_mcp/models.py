@@ -34,6 +34,22 @@ class ChangeSet:
             Total count of all changed files
         """
         return len(self.modified) + len(self.added) + len(self.deleted) + len(self.renamed)
+    
+    def exclude_file(self, filename: str) -> 'ChangeSet':
+        """Create a new ChangeSet excluding a specific file.
+        
+        Args:
+            filename: Name of the file to exclude (e.g., "CHANGELOG.md")
+            
+        Returns:
+            New ChangeSet with the specified file removed from all lists
+        """
+        return ChangeSet(
+            modified=[f for f in self.modified if f != filename],
+            added=[f for f in self.added if f != filename],
+            deleted=[f for f in self.deleted if f != filename],
+            renamed=[(old, new) for old, new in self.renamed if old != filename and new != filename]
+        )
 
 
 @dataclass

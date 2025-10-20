@@ -771,3 +771,4 @@ Contributions are welcome! Here's how you can help:
 - **Documentation**: This README and inline code documentation
 - **Issues**: [GitHub Issues](https://github.com/yourusername/git-commit-mcp-server/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/yourusername/git-commit-mcp-server/discussions)
+

@@ -104,6 +104,51 @@ All notable changes to this project will be documented in this file.
         except (IOError, OSError) as e:
             raise IOError(f"Failed to update changelog: {e}")
     
+    def replace_commit_hash(
+        self,
+        old_hash: str,
+        new_hash: str,
+        repo_path: str,
+        pushed: bool = False
+    ) -> None:
+        """Replace a placeholder commit hash with the actual hash in the changelog.
+        
+        This is used when the changelog is updated before the commit is created,
+        allowing us to replace the temporary hash with the real one.
+        
+        Args:
+            old_hash: Placeholder hash to replace (e.g., "pending")
+            new_hash: Actual commit hash
+            repo_path: Path to the Git repository
+            pushed: Whether the commit was pushed (updates the status indicator)
+            
+        Raises:
+            IOError: If file operations fail
+        """
+        changelog_path = Path(repo_path) / self.changelog_file
+        
+        if not changelog_path.exists():
+            return
+        
+        try:
+            content = changelog_path.read_text(encoding='utf-8')
+            
+            # Replace the old hash with new hash (short version)
+            short_new_hash = new_hash[:7]
+            updated_content = content.replace(old_hash, short_new_hash)
+            
+            # Update push status if needed
+            if pushed:
+                updated_content = updated_content.replace(
+                    f"{short_new_hash} [LOCAL]",
+                    f"{short_new_hash} [PUSHED]"
+                )
+            
+            changelog_path.write_text(updated_content, encoding='utf-8')
+            
+        except (IOError, OSError) as e:
+            raise IOError(f"Failed to replace commit hash in changelog: {e}")
+    
     def _format_entry(
         self,
         commit_hash: str,
