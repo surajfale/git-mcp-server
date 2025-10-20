@@ -269,6 +269,10 @@ def execute_git_commit_and_push(
             # Amend the commit to include the updated CHANGELOG
             repo.index.add([config.changelog_file])
             repo.git.commit('--amend', '--no-edit')
+            
+            # Update result with the final commit hash after amend
+            result.commit_hash = repo.head.commit.hexsha
+            
         except (IOError, GitCommandError) as e:
             # Not critical if this fails
             logger.warning("Failed to update changelog with commit hash", extra={"error": str(e)})

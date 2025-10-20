@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 13:49:20 - 4704493 [LOCAL]
+### 2025-10-20 13:50:58 - 5056bec [LOCAL]
+
+refactor(git-commit-mcp): Refactor 2 files
+
+- Update message_generator.py
+- Update server.py### 2025-10-20 13:49:20 - 4704493 [LOCAL]
 
 chore(git-commit-mcp): Update configuration
 

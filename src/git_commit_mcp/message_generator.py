@@ -156,6 +156,18 @@ class CommitMessageGenerator:
         if changes.modified and not changes.added and not changes.deleted:
             type_scores['refactor'] += 1
         
+        # Deprioritize 'test' if there are significant source file changes
+        source_file_changes = sum(1 for f in changes.modified + changes.added 
+                                 if any(src in f.lower() for src in ['src/', 'lib/', 'app/']) 
+                                 and 'test' not in f.lower())
+        test_file_changes = sum(1 for f in changes.modified + changes.added 
+                               if 'test' in f.lower())
+        
+        if source_file_changes > 0 and source_file_changes >= test_file_changes:
+            # More or equal source changes than test changes
+            # Reduce test score to let source changes determine the type
+            type_scores['test'] = max(0, type_scores['test'] - 2)
+        
         # Find the type with the highest score
         max_score = max(type_scores.values())
         
@@ -313,6 +325,13 @@ class CommitMessageGenerator:
             return "Update documentation"
         
         elif commit_type == 'test':
+            # Check if there are significant source file changes too
+            source_files = [f for f in changes.modified + changes.added 
+                          if any(src in f.lower() for src in ['src/', 'lib/', 'app/']) 
+                          and 'test' not in f.lower()]
+            if source_files and len(source_files) >= len(changes.added):
+                # More source changes than test changes, describe the source changes
+                return f"Update {total_files} file{'s' if total_files != 1 else ''}"
             return "Update tests"
         
         elif commit_type == 'style':
