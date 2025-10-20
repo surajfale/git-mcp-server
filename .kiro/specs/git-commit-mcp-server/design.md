@@ -1059,6 +1059,151 @@ WantedBy=multi-user.target
 }
 ```
 
+### Railway Deployment
+
+Railway is a modern platform-as-a-service that simplifies deployment with built-in CI/CD, persistent volumes, and environment management.
+
+#### Railway Configuration
+
+**railway.json**
+```json
+{
+  "$schema": "https://railway.app/railway.schema.json",
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile"
+  },
+  "deploy": {
+    "startCommand": "python -m git_commit_mcp",
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
+```
+
+#### Dockerfile for Railway
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies (Git and SSH)
+RUN apt-get update && apt-get install -y \
+    git \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy application files
+COPY . /app
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -e .
+
+# Create workspace directory
+RUN mkdir -p /data/git-workspaces && chmod 755 /data/git-workspaces
+
+# Expose port (Railway assigns PORT env var)
+EXPOSE 8000
+
+# Set default environment variables
+ENV TRANSPORT_MODE=http
+ENV HTTP_HOST=0.0.0.0
+ENV WORKSPACE_DIR=/data/git-workspaces
+ENV PYTHONUNBUFFERED=1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+
+# Run server
+CMD ["python", "-m", "git_commit_mcp"]
+```
+
+#### Railway Environment Variables
+
+Configure these in the Railway dashboard:
+
+**Required:**
+- `TRANSPORT_MODE=http`
+- `HTTP_PORT=8000` (or use Railway's `$PORT`)
+- `MCP_AUTH_TOKEN=<generate-secure-token>`
+- `WORKSPACE_DIR=/data/git-workspaces`
+
+**Optional:**
+- `GIT_SSH_KEY_PATH=/data/ssh/id_rsa` (if using SSH)
+- `GIT_USERNAME=<github-username>` (if using HTTPS)
+- `GIT_TOKEN=<github-token>` (if using HTTPS)
+- `CORS_ORIGINS=*` (or specific domains)
+- `LOG_LEVEL=INFO`
+- `ENABLE_METRICS=true`
+
+#### Railway Volume Configuration
+
+1. **Create a Volume:**
+   - Name: `git-workspaces`
+   - Mount Path: `/data`
+   - Size: 2-5 GB (adjust based on needs)
+
+2. **Volume Benefits:**
+   - Cloned repositories persist across deployments
+   - Faster subsequent operations (no re-cloning)
+   - SSH keys can be stored persistently
+   - Reduces bandwidth usage
+
+#### Deployment Steps
+
+1. **Connect Repository:**
+   ```bash
+   # Push code to GitHub
+   git push origin main
+   ```
+
+2. **Create Railway Project:**
+   - Go to Railway dashboard
+   - Click "New Project"
+   - Select "Deploy from GitHub repo"
+   - Choose your repository
+
+3. **Configure Volume:**
+   - In project settings, go to "Volumes"
+   - Click "New Volume"
+   - Set mount path to `/data`
+   - Set size to 2 GB
+
+4. **Set Environment Variables:**
+   - Go to "Variables" tab
+   - Add all required environment variables
+   - Generate secure token for `MCP_AUTH_TOKEN`
+
+5. **Deploy:**
+   - Railway auto-deploys on push
+   - Monitor logs in Railway dashboard
+   - Access via generated Railway URL
+
+#### Railway-Specific Considerations
+
+**Port Binding:**
+Railway provides a `PORT` environment variable. Update config to use it:
+```python
+# In config.py
+http_port: int = int(os.getenv("PORT", "8000"))
+```
+
+**Health Checks:**
+Railway uses the `/health` endpoint to monitor service health.
+
+**Logging:**
+All logs to stdout/stderr are captured by Railway's logging system.
+
+**Scaling:**
+Railway Hobby plan supports vertical scaling. Adjust resources in project settings.
+
+**Custom Domain:**
+Configure custom domain in Railway settings for production use.
+
 ## Future Enhancements
 
 1. Support for custom commit message templates

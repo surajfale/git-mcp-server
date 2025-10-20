@@ -9,13 +9,13 @@ transport modes based on configuration. It handles:
 """
 
 import sys
-import logging
 
 from git_commit_mcp.config import ServerConfig
 from git_commit_mcp.server import run_stdio_server
+from git_commit_mcp.logging_config import setup_logging, get_logger
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# Get logger for this module
+logger = get_logger(__name__)
 
 
 def main():
@@ -40,48 +40,70 @@ def main():
         # Load configuration from environment
         config = ServerConfig.from_env()
         
-        # Setup logging
-        logging.basicConfig(
-            level=getattr(logging, config.log_level),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            stream=sys.stderr  # Log to stderr to avoid interfering with stdio transport
+        # Setup structured logging
+        # For stdio mode, use plain text to avoid interfering with MCP protocol
+        # For HTTP mode, use JSON format for cloud deployments
+        use_json = config.transport_mode == "http"
+        setup_logging(
+            log_level=config.log_level,
+            use_json=use_json,
+            log_file=None  # Always log to stdout/stderr
         )
         
-        logger.info(f"Starting Git Commit MCP Server in {config.transport_mode} mode")
+        logger.info(
+            "Starting Git Commit MCP Server",
+            extra={
+                "transport_mode": config.transport_mode,
+                "version": "1.0.0"
+            }
+        )
         
         # Select and run appropriate server based on transport mode
         if config.transport_mode == "stdio":
-            logger.info("Running in stdio mode for local MCP client communication")
+            logger.info(
+                "Running in stdio mode",
+                extra={"mode": "local", "transport": "stdio"}
+            )
             run_stdio_server()
         elif config.transport_mode == "http":
-            logger.info("Running in HTTP mode for remote client communication")
+            logger.info(
+                "Running in HTTP mode",
+                extra={
+                    "mode": "remote",
+                    "transport": "http",
+                    "host": config.http_host,
+                    "port": config.http_port,
+                    "tls_enabled": config.tls_enabled
+                }
+            )
             # Import here to avoid loading FastAPI dependencies in stdio mode
             try:
                 from git_commit_mcp.http_server import run_http_server
                 run_http_server(config)
             except ImportError as e:
                 logger.error(
-                    "Failed to import HTTP server dependencies. "
-                    "Install with: pip install 'git-commit-mcp-server[remote]'"
+                    "Failed to import HTTP server dependencies",
+                    extra={"error": str(e)}
                 )
-                logger.error(f"Error: {e}")
                 sys.exit(2)
         else:
-            logger.error(f"Unknown transport mode: {config.transport_mode}")
-            logger.error("Valid modes are: 'stdio' or 'http'")
+            logger.error(
+                "Unknown transport mode",
+                extra={"transport_mode": config.transport_mode, "valid_modes": ["stdio", "http"]}
+            )
             sys.exit(1)
             
     except ValueError as e:
         # Configuration validation error
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error", extra={"error": str(e)})
         sys.exit(1)
     except KeyboardInterrupt:
         # Graceful shutdown on Ctrl+C
-        logger.info("Received interrupt signal, shutting down...")
+        logger.info("Received interrupt signal, shutting down")
         sys.exit(0)
     except Exception as e:
         # Unexpected error during startup
-        logger.error(f"Failed to start server: {e}", exc_info=True)
+        logger.exception("Failed to start server", extra={"error": str(e)})
         sys.exit(2)
 
 

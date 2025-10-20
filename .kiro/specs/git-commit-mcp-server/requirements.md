@@ -128,3 +128,17 @@ This document specifies the requirements for a Model Context Protocol (MCP) serv
 3. WHEN deploying to a cloud platform, THE MCP Server SHALL log all operations to stdout for centralized logging systems
 4. WHEN deploying to serverless platforms, THE MCP Server SHALL support stateless operation with external repository storage
 5. WHEN the server starts, THE MCP Server SHALL expose metrics for monitoring and observability
+
+### Requirement 10
+
+**User Story:** As a developer, I want to deploy the MCP server to Railway with persistent storage, so that cloned repositories persist across deployments and restarts.
+
+#### Acceptance Criteria
+
+1. WHEN deploying to Railway, THE MCP Server SHALL provide a Dockerfile optimized for Railway deployment
+2. WHEN deploying to Railway, THE MCP Server SHALL support Railway's volume mounting for persistent workspace storage
+3. WHEN the server starts on Railway, THE MCP Server SHALL create the workspace directory if it does not exist
+4. WHEN Railway restarts the service, THE MCP Server SHALL reuse existing cloned repositories from the persistent volume
+5. WHEN deploying to Railway, THE MCP Server SHALL provide a railway.json configuration file for automated deployment
+6. WHEN deploying to Railway, THE MCP Server SHALL read all configuration from Railway environment variables
+7. WHEN the workspace directory is on a persistent volume, THE MCP Server SHALL implement proper cleanup mechanisms to prevent disk space exhaustion

@@ -89,6 +89,10 @@ class ServerConfig:
     enable_metrics: bool = True
     log_level: str = "INFO"
     
+    # Workspace cleanup settings
+    max_workspace_size_mb: int = 1000  # Maximum workspace size in MB (default: 1 GB)
+    cleanup_enabled: bool = True  # Whether cleanup endpoint is enabled
+    
     @classmethod
     def from_env(cls, env_file: Optional[str] = None) -> "ServerConfig":
         """Load configuration from environment variables.
@@ -120,6 +124,10 @@ class ServerConfig:
         def parse_bool(value: str) -> bool:
             return value.lower() in ("true", "1", "yes", "on")
         
+        # Railway-specific: PORT environment variable takes precedence over HTTP_PORT
+        # Railway dynamically assigns ports, so we check PORT first
+        port_str = os.getenv("PORT") or os.getenv("HTTP_PORT", "8000")
+        
         # Create config from environment
         config = cls(
             # Core settings
@@ -131,7 +139,7 @@ class ServerConfig:
             # Transport settings
             transport_mode=os.getenv("TRANSPORT_MODE", "stdio"),  # type: ignore
             http_host=os.getenv("HTTP_HOST", "0.0.0.0"),
-            http_port=int(os.getenv("HTTP_PORT", "8000")),
+            http_port=int(port_str),
             
             # Authentication settings
             auth_enabled=parse_bool(os.getenv("AUTH_ENABLED", "true")),
@@ -155,6 +163,10 @@ class ServerConfig:
             # Monitoring settings
             enable_metrics=parse_bool(os.getenv("ENABLE_METRICS", "true")),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+            
+            # Workspace cleanup settings
+            max_workspace_size_mb=int(os.getenv("MAX_WORKSPACE_SIZE_MB", "1000")),
+            cleanup_enabled=parse_bool(os.getenv("CLEANUP_ENABLED", "true")),
         )
         
         # Validate configuration
@@ -266,6 +278,13 @@ class ServerConfig:
                 raise ValueError(
                     f"SSH key path is not a file: {self.ssh_key_path}"
                 )
+        
+        # Validate workspace cleanup settings
+        if self.max_workspace_size_mb < 1:
+            raise ValueError(
+                f"Invalid max_workspace_size_mb: {self.max_workspace_size_mb}. "
+                "Must be at least 1 MB"
+            )
     
     def is_remote_mode(self) -> bool:
         """Check if server is configured for remote (HTTP) mode.

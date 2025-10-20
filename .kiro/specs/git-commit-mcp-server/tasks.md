@@ -357,84 +357,141 @@
     - Ensure error handling works consistently across transports
     - _Requirements: 6.1, 6.5, 8.1, 8.5_
 
-- [ ] 15. Create Docker containerization
-  - [ ] 15.1 Write Dockerfile
-    - Create multi-stage Dockerfile with Python 3.11 slim base
+- [x] 15. Create Docker containerization for Railway
+
+
+
+
+  - [x] 15.1 Write Dockerfile optimized for Railway
+
+
+    - Create Dockerfile with Python 3.11 slim base
     - Install system dependencies (git, openssh-client)
-    - Copy application code and install Python dependencies
-    - Create non-root user for security
-    - Set environment variables and expose port 8000
-    - Define CMD to run server in HTTP mode
-    - _Requirements: 9.1_
+    - Copy application code and install Python dependencies with `pip install -e .`
+    - Create workspace directory at `/data/git-workspaces` with proper permissions
+    - Set environment variables (TRANSPORT_MODE=http, HTTP_HOST=0.0.0.0, WORKSPACE_DIR=/data/git-workspaces)
+    - Expose port 8000 and add HEALTHCHECK for Railway monitoring
+    - Define CMD to run `python -m git_commit_mcp`
+    - _Requirements: 9.1, 10.1_
   
-  - [ ] 15.2 Create docker-compose.yml
-    - Define service configuration for local testing
-    - Add environment variables for configuration
-    - Mount volumes for SSH keys and workspace
-    - Configure port mapping and restart policy
-    - _Requirements: 9.1_
-  
-  - [ ] 15.3 Create .env.example file
-    - Document all environment variables with descriptions
-    - Provide example values for each configuration option
-    - Include comments explaining usage
-    - _Requirements: 7.1_
 
-- [ ] 16. Create deployment configurations
-  - [ ] 16.1 Create Kubernetes manifests in `deployment/kubernetes/`
-    - Write `deployment.yaml` with container spec, resource limits, and environment variables
-    - Write `service.yaml` for load balancer configuration
-    - Write `ingress.yaml` for external access with TLS
-    - Create `secrets.yaml.example` for sensitive configuration
-    - _Requirements: 9.1, 9.2, 9.4_
-  
-  - [ ] 16.2 Create Cloud Run configuration in `deployment/cloud-run/`
-    - Write `service.yaml` for Cloud Run deployment
-    - Document deployment commands in README
-    - _Requirements: 9.1, 9.2, 9.4_
-  
-  - [ ] 16.3 Create systemd service in `deployment/systemd/`
-    - Write `git-commit-mcp.service` unit file
-    - Document installation and setup instructions
-    - _Requirements: 9.1_
+  - [x] 15.2 Update config to support Railway's PORT environment variable
 
-- [ ] 17. Update documentation for remote hosting
-  - [ ] 17.1 Update README.md with deployment guides
-    - Add "Deployment" section with overview of options
-    - Document Docker deployment with examples
-    - Document Cloud Run deployment steps
-    - Document Kubernetes deployment steps
-    - Document VPS deployment with systemd
-    - Add client configuration examples for both modes
-    - _Requirements: All remote hosting requirements_
+    - Modify `config.py` to read `PORT` env var with fallback to `HTTP_PORT`
+    - Ensure port binding works with Railway's dynamic port assignment
+    - _Requirements: 10.6_
   
-  - [ ] 17.2 Create deployment troubleshooting guide
-    - Document common deployment issues and solutions
-    - Add authentication troubleshooting steps
-    - Include network and firewall configuration tips
-    - _Requirements: 6.3, 6.4, 7.5, 8.4_
+
+  - [x] 15.3 Create .env.example file for Railway
+
+    - Document all required environment variables (TRANSPORT_MODE, MCP_AUTH_TOKEN, WORKSPACE_DIR)
+    - Document optional variables (GIT_SSH_KEY_PATH, GIT_USERNAME, GIT_TOKEN, CORS_ORIGINS)
+    - Add Railway-specific notes about PORT variable
+    - Include comments explaining usage and Railway volume configuration
+    - _Requirements: 7.1, 10.6_
+
+- [x] 16. Create Railway deployment configuration
+
+
+
+
+  - [x] 16.1 Create railway.json configuration file
+
+
+    - Define build configuration with DOCKERFILE builder
+    - Set dockerfilePath to "Dockerfile"
+    - Configure deploy settings with startCommand, healthcheckPath, and restart policy
+    - Set healthcheckTimeout and restartPolicyMaxRetries
+    - _Requirements: 10.5_
   
-  - [ ]* 17.3 Add API documentation
+  - [x] 16.2 Create deployment documentation in `docs/railway-deployment.md`
+
+
+    - Document Railway volume setup (mount path: /data, size: 2-5 GB)
+    - List all required environment variables with Railway-specific values
+    - Provide step-by-step deployment instructions
+    - Include screenshots or CLI commands for Railway setup
+    - Document how to configure custom domain
+    - _Requirements: 10.2, 10.5, 10.6_
+  
+  - [x] 16.3 Add workspace cleanup mechanism
+
+
+    - Implement cleanup endpoint or scheduled task to prevent disk exhaustion
+    - Add configuration for maximum workspace size
+    - Document cleanup strategy in deployment docs
+    - _Requirements: 10.7_
+
+- [-] 17. Update documentation for Railway hosting
+
+
+
+  - [x] 17.1 Update README.md with Railway deployment section
+
+    - Add "Deployment to Railway" section with quick start
+    - Document Railway Hobby plan requirements
+    - Add Railway badge and deployment button
+    - Include client configuration examples for Railway-hosted server
+    - Link to detailed Railway deployment guide
+    - _Requirements: 10.1, 10.5_
+  
+
+  - [x] 17.2 Create Railway troubleshooting guide
+
+    - Document common Railway deployment issues (volume mounting, port binding, environment variables)
+    - Add authentication troubleshooting for Railway URLs
+    - Include Railway-specific logging and monitoring tips
+    - Document how to check Railway volume usage
+    - _Requirements: 6.3, 6.4, 7.5, 8.4, 10.2_
+  
+  - [x] 17.3 Add API documentation for remote clients
+
+
+
+
+
+
+
     - Document HTTP endpoints with request/response examples
-    - Add authentication header format
-    - Include error response formats
+    - Add authentication header format for Railway deployment
+    - Include Railway URL format and custom domain setup
+    - Document health check endpoint for Railway monitoring
     - _Requirements: 6.1, 6.2, 6.3_
 
-- [ ]* 18. Add monitoring and observability
-  - [ ]* 18.1 Implement metrics endpoint
+
+
+
+
+
+- [x] 18. Add monitoring and observability
+
+
+
+
+  - [x] 18.1 Implement metrics endpoint
+
+
+
+
+
     - Add `/metrics` endpoint with Prometheus-compatible metrics
     - Track request counts, latencies, and error rates
     - Track Git operation metrics (commits, pushes, failures)
     - _Requirements: 9.5_
   
-  - [ ]* 18.2 Enhance logging
+  - [-] 18.2 Enhance logging
+
+
+
     - Add structured logging with JSON format
     - Include request IDs for tracing
     - Log all Git operations with outcomes
     - Add audit logging for security events
     - _Requirements: 9.3_
 
-- [ ]* 19. Performance optimization and testing
+- [ ] 19. Performance optimization and testing
+
+
   - [ ]* 19.1 Implement repository caching
     - Add caching layer for cloned repositories
     - Implement TTL-based cache eviction

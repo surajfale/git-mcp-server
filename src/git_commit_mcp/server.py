@@ -1,6 +1,7 @@
 """Main MCP server implementation."""
 
 import os
+import time
 from pathlib import Path
 from typing import Optional
 from git import Repo
@@ -15,6 +16,14 @@ from git_commit_mcp.message_generator import CommitMessageGenerator
 from git_commit_mcp.git_operations import GitOperationsManager
 from git_commit_mcp.changelog_manager import ChangelogManager
 from git_commit_mcp.repository_manager import RepositoryManager, GitCredentials
+from git_commit_mcp.logging_config import (
+    get_logger,
+    log_git_operation,
+    log_security_event
+)
+
+# Get logger for this module
+logger = get_logger(__name__)
 
 # Initialize FastMCP server
 mcp = FastMCP("git-commit-server")
@@ -82,6 +91,16 @@ def execute_git_commit_and_push(
     
     repo_manager = None
     is_remote_repo = False
+    operation_start_time = time.time()
+    
+    # Log operation start
+    logger.info(
+        "Starting git commit and push operation",
+        extra={
+            "repository_path": repository_path,
+            "confirm_push": confirm_push
+        }
+    )
     
     try:
         # Determine if repository_path is a URL or local path
@@ -123,8 +142,16 @@ def execute_git_commit_and_push(
                             )
                 
                 # Clone or get existing repository
+                logger.info(
+                    "Accessing remote repository",
+                    extra={"repository_url": repository_path, "auth_type": credentials.auth_type if credentials else "none"}
+                )
                 repo = repo_manager.get_or_clone_repository(repository_path, credentials)
                 repo_path = Path(repo.working_dir)
+                logger.info(
+                    "Remote repository accessed successfully",
+                    extra={"repository_url": repository_path, "local_path": str(repo_path)}
+                )
             else:
                 # Handle local repository path
                 repo_path = Path(repository_path).resolve()
@@ -198,31 +225,46 @@ def execute_git_commit_and_push(
         
         # Step 4: Create commit
         try:
+            logger.info("Creating commit", extra={"files_changed": result.files_changed})
             commit_hash = git_ops.create_commit(repo, commit_message)
             result.commit_hash = commit_hash
+            logger.info(
+                "Commit created successfully",
+                extra={"commit_hash": commit_hash, "files_changed": result.files_changed}
+            )
         except (GitCommandError, InvalidGitRepositoryError) as e:
             result.error = f"Failed to create commit: {e.stderr if hasattr(e, 'stderr') else str(e)}"
             result.message = result.error
+            logger.error("Failed to create commit", extra={"error": result.error})
             return result.__dict__
         
         # Step 5: Handle push (if confirmed)
         if confirm_push:
             try:
+                logger.info("Pushing to remote", extra={"commit_hash": commit_hash})
                 push_result = git_ops.push_to_remote(repo)
                 result.pushed = push_result["success"]
                 result.message = push_result["message"]
+                if result.pushed:
+                    logger.info(
+                        "Push completed successfully",
+                        extra={"commit_hash": commit_hash, "branch": push_result.get("branch")}
+                    )
             except ValueError as e:
                 # No remote configured - not a critical error
                 result.pushed = False
                 result.message = f"Commit created successfully but not pushed: {str(e)}"
+                logger.warning("No remote configured for push", extra={"error": str(e)})
             except (GitCommandError, InvalidGitRepositoryError) as e:
                 # Push failed - commit still succeeded
                 result.pushed = False
                 error_msg = e.stderr if hasattr(e, 'stderr') else str(e)
                 result.message = f"Commit created successfully but push failed: {error_msg}"
+                logger.error("Push failed", extra={"error": error_msg, "commit_hash": commit_hash})
         else:
             result.pushed = False
             result.message = f"Commit created successfully (not pushed)"
+            logger.info("Push skipped (not confirmed)", extra={"commit_hash": commit_hash})
         
         # Step 6: Update changelog with actual commit info and create a second commit for it
         try:
@@ -263,6 +305,21 @@ def execute_git_commit_and_push(
         if not result.message:
             result.message = f"Successfully committed {result.files_changed} file(s) [{short_hash}]"
         
+        # Log final operation result
+        operation_duration = time.time() - operation_start_time
+        log_git_operation(
+            operation="commit_and_push",
+            repository=repository_path,
+            success=True,
+            duration=operation_duration,
+            details={
+                "commit_hash": commit_hash,
+                "files_changed": result.files_changed,
+                "pushed": result.pushed,
+                "changelog_updated": result.changelog_updated
+            }
+        )
+        
         return result.__dict__
         
     except GitCommandError as e:
@@ -270,21 +327,69 @@ def execute_git_commit_and_push(
         error_msg = e.stderr if hasattr(e, 'stderr') else str(e)
         result.error = f"Git operation failed: {error_msg}"
         result.message = result.error
+        
+        # Log error
+        operation_duration = time.time() - operation_start_time
+        log_git_operation(
+            operation="commit_and_push",
+            repository=repository_path,
+            success=False,
+            duration=operation_duration,
+            error=result.error
+        )
+        logger.error("Git command error", extra={"error": error_msg, "repository": repository_path})
+        
         return result.__dict__
     except InvalidGitRepositoryError as e:
         # Invalid repository error
         result.error = f"Invalid Git repository: {str(e)}"
         result.message = result.error
+        
+        # Log error
+        operation_duration = time.time() - operation_start_time
+        log_git_operation(
+            operation="commit_and_push",
+            repository=repository_path,
+            success=False,
+            duration=operation_duration,
+            error=result.error
+        )
+        logger.error("Invalid Git repository", extra={"error": str(e), "repository": repository_path})
+        
         return result.__dict__
     except ValueError as e:
         # Configuration or validation error
         result.error = f"Configuration error: {str(e)}"
         result.message = result.error
+        
+        # Log error
+        operation_duration = time.time() - operation_start_time
+        log_git_operation(
+            operation="commit_and_push",
+            repository=repository_path,
+            success=False,
+            duration=operation_duration,
+            error=result.error
+        )
+        logger.error("Configuration error", extra={"error": str(e), "repository": repository_path})
+        
         return result.__dict__
     except Exception as e:
         # Catch-all for unexpected errors
         result.error = f"Unexpected error: {str(e)}"
         result.message = result.error
+        
+        # Log error
+        operation_duration = time.time() - operation_start_time
+        log_git_operation(
+            operation="commit_and_push",
+            repository=repository_path,
+            success=False,
+            duration=operation_duration,
+            error=result.error
+        )
+        logger.exception("Unexpected error during git operation", extra={"repository": repository_path})
+        
         return result.__dict__
 
 
