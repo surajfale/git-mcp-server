@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 01:29:12 - c272ac3 [LOCAL]
+### 2025-10-20 08:29:38 - d8ac136 [LOCAL]
+
+docs(git-commit-mcp): Update documentation
+
+- Add Dockerfile
+- Add RAILWAY_DEPLOYMENT_SPEC.md
+- Add api-reference.md
+- Add railway-deployment.md
+- Add railway-troubleshooting.md### 2025-10-20 01:29:12 - c272ac3 [LOCAL]
 
 test: Update tests
 
