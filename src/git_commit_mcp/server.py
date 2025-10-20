@@ -20,20 +20,15 @@ mcp = FastMCP("git-commit-server")
 config = ServerConfig()
 
 
-@mcp.tool()
-def git_commit_and_push(
+def execute_git_commit_and_push(
     repository_path: str = ".",
     confirm_push: bool = False
 ) -> dict:
     """
     Track changes, generate commit message, commit, and optionally push.
     
-    This tool automates the Git commit workflow by:
-    1. Detecting all changes in the repository
-    2. Generating a conventional commit message
-    3. Staging and committing the changes
-    4. Optionally pushing to remote (if confirm_push is True)
-    5. Updating the CHANGELOG.md file
+    This is the core implementation function that can be called directly
+    or through the MCP tool interface.
     
     Args:
         repository_path: Path to the Git repository (default: current directory)
@@ -180,3 +175,36 @@ def git_commit_and_push(
         result.error = f"Unexpected error: {str(e)}"
         result.message = result.error
         return result.__dict__
+
+
+@mcp.tool()
+def git_commit_and_push(
+    repository_path: str = ".",
+    confirm_push: bool = False
+) -> dict:
+    """
+    Track changes, generate commit message, commit, and optionally push.
+    
+    This tool automates the Git commit workflow by:
+    1. Detecting all changes in the repository
+    2. Generating a conventional commit message
+    3. Staging and committing the changes
+    4. Optionally pushing to remote (if confirm_push is True)
+    5. Updating the CHANGELOG.md file
+    
+    Args:
+        repository_path: Path to the Git repository (default: current directory)
+        confirm_push: Whether to push to remote after committing (default: False)
+    
+    Returns:
+        Dictionary containing commit result information:
+            - success: Whether the operation completed successfully
+            - commit_hash: The SHA hash of the created commit
+            - commit_message: The full commit message used
+            - files_changed: Number of files affected
+            - pushed: Whether the commit was pushed to remote
+            - changelog_updated: Whether CHANGELOG.md was updated
+            - message: Human-readable status message
+            - error: Error message if operation failed
+    """
+    return execute_git_commit_and_push(repository_path, confirm_push)

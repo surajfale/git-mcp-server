@@ -23,7 +23,13 @@
     - Write `ServerConfig` dataclass for configuration settings
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
   
-  - [ ]* 2.2 Write unit tests for data models
+  - [x] 2.2 Write unit tests for data models
+
+
+
+
+
+
     - Create `tests/test_models.py` with tests for ChangeSet methods (is_empty, total_files)
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
@@ -41,7 +47,12 @@
     - Return populated ChangeSet object
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
   
-  - [ ]* 3.2 Write unit tests for ChangeTracker
+  - [x] 3.2 Write unit tests for ChangeTracker
+
+
+
+
+
     - Create `tests/test_change_tracker.py` with mock repository tests
     - Test scenarios: modified only, added only, deleted only, mixed changes, no changes
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
@@ -60,8 +71,14 @@
     - Write `generate_message()` method that combines type, scope, and bullets into conventional commit format
     - Ensure summary is limited to 2 lines maximum
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
-  
-  - [ ]* 4.2 Write unit tests for CommitMessageGenerator
+  -
+
+  - [x] 4.2 Write unit tests for CommitMessageGenerator
+
+
+
+
+
     - Create `tests/test_message_generator.py` with tests for type detection, scope extraction, and message formatting
     - Test bullet point limiting to 5 items
     - Test summary line limiting to 2 lines
@@ -82,7 +99,14 @@
     - Implement error handling for each operation (InvalidGitRepositoryError, GitCommandError)
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 4.2, 4.4, 4.5_
   
-  - [ ]* 5.2 Write unit tests for GitOperationsManager
+  - [x] 5.2 Write unit tests for GitOperationsManager
+
+
+
+
+
+
+
     - Create `tests/test_git_operations.py` with mocked GitPython operations
     - Test staging, committing, and pushing with success and failure scenarios
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.2, 4.4, 4.5_
@@ -101,8 +125,15 @@
     - Format entries with date, short hash, push status indicator ([PUSHED] or [LOCAL])
     - Handle file I/O errors gracefully
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
-  
-  - [ ]* 6.2 Write unit tests for ChangelogManager
+  -
+
+  - [x] 6.2 Write unit tests for ChangelogManager
+
+
+
+
+
+
     - Create `tests/test_changelog_manager.py` with tests for file creation and entry appending
     - Test format consistency and chronological ordering
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
@@ -152,7 +183,10 @@
     - Include type hints throughout the codebase
     - _Requirements: All requirements_
 
-- [ ]* 9. Integration testing and validation
+- [-] 9. Integration testing and validation
+
+
+
   - Create `tests/test_integration.py` with end-to-end workflow tests
   - Set up test Git repository fixture
   - Test complete workflow: make changes → invoke tool → verify commit → verify changelog
