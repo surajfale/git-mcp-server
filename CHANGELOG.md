@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 14:21:35 - d0d66e2 [LOCAL]
+### 2025-10-20 14:25:18 - 5296a3e [LOCAL]
+
+chore: Update logging
+
+- Add commit_fix.py
+- Remove quick_commit.py
+- Update railway.json### 2025-10-20 14:21:35 - d0d66e2 [PUSHED]
 
 chore(git-commit-mcp): Update logging
 
