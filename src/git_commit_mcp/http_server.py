@@ -101,10 +101,13 @@ def get_repository_manager() -> RepositoryManager:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app):
     """Lifespan context manager for FastAPI application.
     
     Handles startup and shutdown events for the application.
+    
+    Args:
+        app: FastAPI application instance
     """
     # Startup
     logger.info(
