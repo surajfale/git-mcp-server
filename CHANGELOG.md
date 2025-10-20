@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 14:25:18 - 5296a3e [LOCAL]
+### 2025-10-20 14:30:05 - b793bd4 [LOCAL]
+
+chore(git-commit-mcp): Update logging
+
+- Add push_fix.py
+- Remove commit_fix.py
+- Update http_server.py### 2025-10-20 14:25:18 - 5296a3e [PUSHED]
 
 chore: Update logging
 

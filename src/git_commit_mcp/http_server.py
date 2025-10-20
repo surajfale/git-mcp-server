@@ -130,14 +130,14 @@ async def lifespan(app):
     logger.info("Shutting down Git Commit MCP HTTP Server")
 
 
-def create_app(config: ServerConfig) -> FastAPI:
+def create_app(config: ServerConfig):
     """Create and configure FastAPI application.
     
     Args:
         config: Server configuration
         
     Returns:
-        Configured FastAPI application
+        Configured FastAPI application instance
         
     Raises:
         ImportError: If FastAPI dependencies are not installed
@@ -250,14 +250,14 @@ def create_app(config: ServerConfig) -> FastAPI:
     return app
 
 
-def create_http_server(config: ServerConfig) -> FastAPI:
+def create_http_server(config: ServerConfig):
     """Create HTTP server with all endpoints configured.
     
     Args:
         config: Server configuration
         
     Returns:
-        Configured FastAPI application with all endpoints
+        Configured FastAPI application instance with all endpoints
     """
     app = create_app(config)
     
