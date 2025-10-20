@@ -7,7 +7,7 @@ bucket algorithm.
 
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Optional, Tuple
 from threading import Lock
 
@@ -231,7 +231,7 @@ class TokenValidator:
             # Check expiration
             if "exp" in payload:
                 exp_timestamp = payload["exp"]
-                if datetime.utcnow().timestamp() > exp_timestamp:
+                if datetime.now(timezone.utc).timestamp() > exp_timestamp:
                     return False, None, "Token has expired"
             
             return True, payload, None
@@ -307,12 +307,13 @@ class TokenValidator:
         if not JWT_AVAILABLE:
             return None
         
-        # Add expiration to payload
-        exp_time = datetime.utcnow() + timedelta(seconds=expires_in_seconds)
+        # Add expiration to payload using timezone-aware datetime
+        now = datetime.now(timezone.utc)
+        exp_time = now + timedelta(seconds=expires_in_seconds)
         payload_with_exp = {
             **payload,
             "exp": exp_time.timestamp(),
-            "iat": datetime.utcnow().timestamp()
+            "iat": now.timestamp()
         }
         
         # Encode token
