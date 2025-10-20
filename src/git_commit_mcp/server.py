@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+from typing import Optional
 from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
 
@@ -13,12 +14,28 @@ from git_commit_mcp.change_tracker import ChangeTracker
 from git_commit_mcp.message_generator import CommitMessageGenerator
 from git_commit_mcp.git_operations import GitOperationsManager
 from git_commit_mcp.changelog_manager import ChangelogManager
+from git_commit_mcp.repository_manager import RepositoryManager, GitCredentials
 
 # Initialize FastMCP server
 mcp = FastMCP("git-commit-server")
 
 # Initialize configuration (can be overridden by loading from environment)
 config = ServerConfig()
+
+# Initialize repository manager (lazy initialization)
+_repo_manager: Optional[RepositoryManager] = None
+
+
+def get_repository_manager() -> RepositoryManager:
+    """Get or create the global repository manager instance.
+    
+    Returns:
+        RepositoryManager instance configured with current settings
+    """
+    global _repo_manager
+    if _repo_manager is None:
+        _repo_manager = RepositoryManager(workspace_dir=config.workspace_dir)
+    return _repo_manager
 
 
 def execute_git_commit_and_push(
@@ -29,10 +46,15 @@ def execute_git_commit_and_push(
     Track changes, generate commit message, commit, and optionally push.
     
     This is the core implementation function that can be called directly
-    or through the MCP tool interface.
+    or through the MCP tool interface. It supports both local paths and
+    remote repository URLs.
     
     Args:
-        repository_path: Path to the Git repository (default: current directory)
+        repository_path: Path to the Git repository or remote URL (default: current directory)
+                        Supports:
+                        - Local paths: ".", "/path/to/repo", "relative/path"
+                        - SSH URLs: "git@github.com:user/repo.git"
+                        - HTTPS URLs: "https://github.com/user/repo.git"
         confirm_push: Whether to push to remote after committing (default: False)
     
     Returns:
@@ -58,20 +80,74 @@ def execute_git_commit_and_push(
         error=None
     )
     
+    repo_manager = None
+    is_remote_repo = False
+    
     try:
-        # Validate and resolve repository path
-        repo_path = Path(repository_path).resolve()
-        
-        if not repo_path.exists():
-            result.error = f"Repository path does not exist: {repository_path}"
-            result.message = result.error
-            return result.__dict__
+        # Determine if repository_path is a URL or local path
+        is_remote_repo = (
+            repository_path.startswith("http://") or
+            repository_path.startswith("https://") or
+            repository_path.startswith("git@") or
+            repository_path.startswith("ssh://")
+        )
         
         # Initialize Git repository
         try:
-            repo = Repo(repo_path)
-        except InvalidGitRepositoryError:
+            if is_remote_repo:
+                # Handle remote repository URL
+                repo_manager = get_repository_manager()
+                
+                # Build credentials from config if available
+                credentials = None
+                if config.ssh_key_path or config.git_username or config.git_token:
+                    # Determine auth type based on URL and available credentials
+                    if repository_path.startswith("git@") or repository_path.startswith("ssh://"):
+                        if config.ssh_key_path:
+                            credentials = GitCredentials(
+                                auth_type="ssh",
+                                ssh_key=config.ssh_key_path
+                            )
+                    elif repository_path.startswith("http"):
+                        if config.git_token:
+                            credentials = GitCredentials(
+                                auth_type="token",
+                                token=config.git_token
+                            )
+                        elif config.git_username:
+                            # Note: For HTTPS with username/password, password should be in config
+                            # For now, we'll use token auth as it's more common
+                            credentials = GitCredentials(
+                                auth_type="token",
+                                token=config.git_token or ""
+                            )
+                
+                # Clone or get existing repository
+                repo = repo_manager.get_or_clone_repository(repository_path, credentials)
+                repo_path = Path(repo.working_dir)
+            else:
+                # Handle local repository path
+                repo_path = Path(repository_path).resolve()
+                
+                if not repo_path.exists():
+                    result.error = f"Repository path does not exist: {repository_path}"
+                    result.message = result.error
+                    return result.__dict__
+                
+                repo_manager = get_repository_manager()
+                repo = repo_manager.get_local_repository(str(repo_path))
+                
+        except InvalidGitRepositoryError as e:
             result.error = f"Not a git repository: {repository_path}"
+            result.message = result.error
+            return result.__dict__
+        except GitCommandError as e:
+            error_msg = e.stderr if hasattr(e, 'stderr') else str(e)
+            result.error = f"Failed to access repository: {error_msg}"
+            result.message = result.error
+            return result.__dict__
+        except FileNotFoundError as e:
+            result.error = str(e)
             result.message = result.error
             return result.__dict__
         
@@ -189,6 +265,22 @@ def execute_git_commit_and_push(
         
         return result.__dict__
         
+    except GitCommandError as e:
+        # Git operation error - provide detailed error message
+        error_msg = e.stderr if hasattr(e, 'stderr') else str(e)
+        result.error = f"Git operation failed: {error_msg}"
+        result.message = result.error
+        return result.__dict__
+    except InvalidGitRepositoryError as e:
+        # Invalid repository error
+        result.error = f"Invalid Git repository: {str(e)}"
+        result.message = result.error
+        return result.__dict__
+    except ValueError as e:
+        # Configuration or validation error
+        result.error = f"Configuration error: {str(e)}"
+        result.message = result.error
+        return result.__dict__
     except Exception as e:
         # Catch-all for unexpected errors
         result.error = f"Unexpected error: {str(e)}"
@@ -211,8 +303,16 @@ def git_commit_and_push(
     4. Optionally pushing to remote (if confirm_push is True)
     5. Updating the CHANGELOG.md file
     
+    Supports both local repositories and remote repository URLs.
+    For remote repositories, the tool will clone them to a workspace
+    and perform operations there.
+    
     Args:
-        repository_path: Path to the Git repository (default: current directory)
+        repository_path: Path to the Git repository or remote URL (default: current directory)
+                        Supports:
+                        - Local paths: ".", "/path/to/repo", "relative/path"
+                        - SSH URLs: "git@github.com:user/repo.git"
+                        - HTTPS URLs: "https://github.com/user/repo.git"
         confirm_push: Whether to push to remote after committing (default: False)
     
     Returns:
@@ -227,3 +327,13 @@ def git_commit_and_push(
             - error: Error message if operation failed
     """
     return execute_git_commit_and_push(repository_path, confirm_push)
+
+
+def run_stdio_server() -> None:
+    """Run the MCP server in stdio mode.
+    
+    This function starts the FastMCP server with stdio transport for
+    local MCP client communication. This is the default mode for
+    AI assistants that support MCP.
+    """
+    mcp.run(transport="stdio")
