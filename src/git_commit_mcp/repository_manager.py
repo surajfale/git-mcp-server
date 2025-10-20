@@ -4,10 +4,12 @@ import hashlib
 import os
 import shutil
 import tempfile
+import time
 from pathlib import Path
-from typing import Literal, Optional
-from dataclasses import dataclass
+from typing import Literal, Optional, Dict
+from dataclasses import dataclass, field
 from threading import Lock
+from datetime import datetime, timedelta
 
 from git import Repo
 from git.exc import GitCommandError, InvalidGitRepositoryError
@@ -47,6 +49,40 @@ class GitCredentials:
                 raise ValueError("Token authentication requires token")
 
 
+@dataclass
+class CachedRepository:
+    """Cached repository metadata.
+    
+    Attributes:
+        repo: GitPython Repo object
+        repo_id: Unique identifier for the repository
+        repo_url: Original repository URL
+        last_accessed: Timestamp of last access
+        access_count: Number of times this repository has been accessed
+    """
+    repo: Repo
+    repo_id: str
+    repo_url: str
+    last_accessed: float = field(default_factory=time.time)
+    access_count: int = 0
+    
+    def update_access(self) -> None:
+        """Update access metadata."""
+        self.last_accessed = time.time()
+        self.access_count += 1
+    
+    def is_expired(self, ttl_seconds: int) -> bool:
+        """Check if the cached repository has expired.
+        
+        Args:
+            ttl_seconds: Time-to-live in seconds
+            
+        Returns:
+            True if expired, False otherwise
+        """
+        return (time.time() - self.last_accessed) > ttl_seconds
+
+
 class RepositoryManager:
     """Manages Git repository access for both local and remote repositories.
     
@@ -56,25 +92,43 @@ class RepositoryManager:
     - Managing SSH and HTTPS authentication
     - Workspace cleanup
     - Concurrent access control via locking
+    - Repository caching with TTL-based eviction
     
     Attributes:
         workspace_dir: Directory where remote repositories are cloned
+        cache_ttl_seconds: Time-to-live for cached repositories in seconds
+        max_cache_size: Maximum number of repositories to keep in cache
         _locks: Dictionary of locks for concurrent access control
         _lock_manager: Lock for managing the locks dictionary
+        _cache: Dictionary of cached repositories
+        _cache_lock: Lock for cache operations
     """
     
-    def __init__(self, workspace_dir: str = "/tmp/git-workspaces"):
+    def __init__(
+        self, 
+        workspace_dir: str = "/tmp/git-workspaces",
+        cache_ttl_seconds: int = 3600,  # 1 hour default
+        max_cache_size: int = 50
+    ):
         """Initialize the repository manager.
         
         Args:
             workspace_dir: Directory for cloning remote repositories
+            cache_ttl_seconds: Time-to-live for cached repositories (default: 3600s/1h)
+            max_cache_size: Maximum number of repositories in cache (default: 50)
         """
         self.workspace_dir = Path(workspace_dir)
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_ttl_seconds = cache_ttl_seconds
+        self.max_cache_size = max_cache_size
         
         # Locks for concurrent access control
         self._locks: dict[str, Lock] = {}
         self._lock_manager = Lock()
+        
+        # Repository cache
+        self._cache: Dict[str, CachedRepository] = {}
+        self._cache_lock = Lock()
     
     def _get_repo_lock(self, repo_id: str) -> Lock:
         """Get or create a lock for a specific repository.
@@ -114,6 +168,144 @@ class RepositoryManager:
         """
         repo_id = self._generate_repo_id(repo_url)
         return self.workspace_dir / repo_id
+    
+    def _evict_expired_cache_entries(self) -> int:
+        """Remove expired entries from the cache.
+        
+        Returns:
+            Number of entries evicted
+        """
+        evicted = 0
+        with self._cache_lock:
+            expired_keys = [
+                repo_id for repo_id, cached_repo in self._cache.items()
+                if cached_repo.is_expired(self.cache_ttl_seconds)
+            ]
+            
+            for repo_id in expired_keys:
+                del self._cache[repo_id]
+                evicted += 1
+        
+        return evicted
+    
+    def _evict_lru_cache_entries(self) -> int:
+        """Evict least recently used cache entries if cache is full.
+        
+        Returns:
+            Number of entries evicted
+        """
+        evicted = 0
+        with self._cache_lock:
+            if len(self._cache) >= self.max_cache_size:
+                # Sort by last accessed time (oldest first)
+                sorted_entries = sorted(
+                    self._cache.items(),
+                    key=lambda x: x[1].last_accessed
+                )
+                
+                # Remove oldest entries to make room
+                num_to_remove = len(self._cache) - self.max_cache_size + 1
+                for repo_id, _ in sorted_entries[:num_to_remove]:
+                    del self._cache[repo_id]
+                    evicted += 1
+        
+        return evicted
+    
+    def _get_from_cache(self, repo_id: str) -> Optional[CachedRepository]:
+        """Get a repository from cache if available and not expired.
+        
+        Args:
+            repo_id: Unique identifier for the repository
+            
+        Returns:
+            CachedRepository if found and valid, None otherwise
+        """
+        with self._cache_lock:
+            cached_repo = self._cache.get(repo_id)
+            
+            if cached_repo:
+                # Check if expired
+                if cached_repo.is_expired(self.cache_ttl_seconds):
+                    del self._cache[repo_id]
+                    return None
+                
+                # Update access metadata
+                cached_repo.update_access()
+                return cached_repo
+            
+            return None
+    
+    def _add_to_cache(self, repo_id: str, repo_url: str, repo: Repo) -> None:
+        """Add a repository to the cache.
+        
+        Args:
+            repo_id: Unique identifier for the repository
+            repo_url: Original repository URL
+            repo: GitPython Repo object
+        """
+        # Evict expired entries first
+        self._evict_expired_cache_entries()
+        
+        # Evict LRU entries if cache is full
+        self._evict_lru_cache_entries()
+        
+        with self._cache_lock:
+            cached_repo = CachedRepository(
+                repo=repo,
+                repo_id=repo_id,
+                repo_url=repo_url
+            )
+            cached_repo.update_access()
+            self._cache[repo_id] = cached_repo
+    
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
+        with self._cache_lock:
+            return {
+                "size": len(self._cache),
+                "max_size": self.max_cache_size,
+                "ttl_seconds": self.cache_ttl_seconds,
+                "total_access_count": sum(
+                    cached.access_count for cached in self._cache.values()
+                )
+            }
+    
+    def clear_cache(self) -> int:
+        """Clear all cached repositories.
+        
+        Returns:
+            Number of entries cleared
+        """
+        with self._cache_lock:
+            count = len(self._cache)
+            self._cache.clear()
+            return count
+    
+    def warm_cache(self, repo_urls: list[str], credentials: Optional[GitCredentials] = None) -> int:
+        """Pre-load frequently accessed repositories into cache.
+        
+        Args:
+            repo_urls: List of repository URLs to warm up
+            credentials: Optional credentials for authentication
+            
+        Returns:
+            Number of repositories successfully warmed
+        """
+        warmed = 0
+        for repo_url in repo_urls:
+            try:
+                # This will clone/pull and add to cache
+                self.get_or_clone_repository(repo_url, credentials)
+                warmed += 1
+            except (GitCommandError, ValueError):
+                # Skip repositories that fail to clone
+                continue
+        
+        return warmed
     
     def configure_ssh_key(self, ssh_key_path: str) -> None:
         """Configure SSH key for Git operations.
@@ -184,8 +376,9 @@ class RepositoryManager:
     ) -> Repo:
         """Get or clone a remote repository to the workspace.
         
-        If the repository already exists in the workspace, it will be updated
-        (pulled). Otherwise, it will be cloned.
+        If the repository already exists in the cache and is not expired, it will
+        be returned from cache. Otherwise, if it exists in the workspace, it will
+        be updated (pulled). If it doesn't exist, it will be cloned.
         
         Args:
             repo_url: URL of the Git repository (SSH or HTTPS)
@@ -204,6 +397,12 @@ class RepositoryManager:
         
         # Generate repository ID and path
         repo_id = self._generate_repo_id(repo_url)
+        
+        # Check cache first
+        cached_repo = self._get_from_cache(repo_id)
+        if cached_repo:
+            return cached_repo.repo
+        
         repo_path = self._get_repo_path(repo_url)
         
         # Acquire lock for this repository
@@ -234,6 +433,9 @@ class RepositoryManager:
                             origin = repo.remotes[0]
                             origin.pull()
                         
+                        # Add to cache
+                        self._add_to_cache(repo_id, repo_url, repo)
+                        
                         return repo
                     except (InvalidGitRepositoryError, GitCommandError) as e:
                         # If opening/pulling fails, remove and re-clone
@@ -244,6 +446,9 @@ class RepositoryManager:
                 auth_url = self._build_auth_url(repo_url, credentials)
                 
                 repo = Repo.clone_from(auth_url, repo_path)
+                
+                # Add to cache
+                self._add_to_cache(repo_id, repo_url, repo)
                 
                 return repo
                 
@@ -325,6 +530,11 @@ class RepositoryManager:
                         f"Failed to remove repository at {repo_path}: {e}"
                     ) from e
             
+            # Remove from cache
+            with self._cache_lock:
+                if repo_id in self._cache:
+                    del self._cache[repo_id]
+            
             # Remove lock from dictionary
             with self._lock_manager:
                 if repo_id in self._locks:
@@ -352,6 +562,9 @@ class RepositoryManager:
                 except OSError:
                     # Continue cleaning up other directories even if one fails
                     pass
+        
+        # Clear cache
+        self.clear_cache()
         
         # Clear all locks
         with self._lock_manager:

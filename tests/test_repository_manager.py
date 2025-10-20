@@ -650,3 +650,229 @@ class TestRepositoryManager:
         lock2 = manager._get_repo_lock(repo_id)
         
         assert lock1 is lock2
+    
+    # Tests for repository caching
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_cache_hit_on_second_access(self, mock_repo_class, manager):
+        """Test that second access to same repository uses cache."""
+        url = "https://github.com/user/repo.git"
+        
+        # Mock successful clone
+        mock_repo_instance = Mock(spec=Repo)
+        mock_repo_class.clone_from.return_value = mock_repo_instance
+        
+        # First access - should clone
+        result1 = manager.get_or_clone_repository(url)
+        
+        # Second access - should use cache
+        result2 = manager.get_or_clone_repository(url)
+        
+        assert result1 is result2
+        # Clone should only be called once
+        assert mock_repo_class.clone_from.call_count == 1
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_cache_expiration(self, mock_repo_class, manager):
+        """Test that cached repositories expire after TTL."""
+        # Create manager with short TTL
+        manager = RepositoryManager(
+            workspace_dir=str(manager.workspace_dir),
+            cache_ttl_seconds=1
+        )
+        
+        url = "https://github.com/user/repo.git"
+        
+        # Mock successful clone
+        mock_repo_instance = Mock(spec=Repo)
+        mock_repo_class.clone_from.return_value = mock_repo_instance
+        
+        # First access
+        result1 = manager.get_or_clone_repository(url)
+        
+        # Wait for cache to expire
+        time.sleep(1.1)
+        
+        # Create fake repository directory for second access
+        repo_id = manager._generate_repo_id(url)
+        repo_path = manager.workspace_dir / repo_id
+        (repo_path / ".git").mkdir(parents=True, exist_ok=True)
+        
+        # Mock existing repository for pull
+        mock_repo_instance2 = Mock(spec=Repo)
+        mock_remote = Mock()
+        mock_remote.pull = Mock()
+        mock_repo_instance2.remotes = [mock_remote]
+        mock_repo_class.return_value = mock_repo_instance2
+        
+        # Second access after expiration - should pull
+        result2 = manager.get_or_clone_repository(url)
+        
+        # Should have pulled (cache expired)
+        mock_remote.pull.assert_called_once()
+    
+    def test_get_cache_stats(self, manager):
+        """Test getting cache statistics."""
+        stats = manager.get_cache_stats()
+        
+        assert "size" in stats
+        assert "max_size" in stats
+        assert "ttl_seconds" in stats
+        assert "total_access_count" in stats
+        assert stats["size"] == 0
+        assert stats["max_size"] == 50
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_cache_stats_after_access(self, mock_repo_class, manager):
+        """Test cache statistics after repository access."""
+        url = "https://github.com/user/repo.git"
+        
+        # Mock successful clone
+        mock_repo_instance = Mock(spec=Repo)
+        mock_repo_class.clone_from.return_value = mock_repo_instance
+        
+        # Access repository twice
+        manager.get_or_clone_repository(url)
+        manager.get_or_clone_repository(url)
+        
+        stats = manager.get_cache_stats()
+        
+        assert stats["size"] == 1
+        assert stats["total_access_count"] == 2
+    
+    def test_clear_cache(self, manager):
+        """Test clearing the cache."""
+        # Add some entries to cache manually
+        from git_commit_mcp.repository_manager import CachedRepository
+        
+        mock_repo = Mock(spec=Repo)
+        cached = CachedRepository(
+            repo=mock_repo,
+            repo_id="test_id",
+            repo_url="https://github.com/user/repo.git"
+        )
+        
+        with manager._cache_lock:
+            manager._cache["test_id"] = cached
+        
+        assert len(manager._cache) == 1
+        
+        count = manager.clear_cache()
+        
+        assert count == 1
+        assert len(manager._cache) == 0
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_cache_eviction_on_max_size(self, mock_repo_class, manager):
+        """Test that LRU eviction occurs when cache is full."""
+        # Create manager with small cache
+        manager = RepositoryManager(
+            workspace_dir=str(manager.workspace_dir),
+            max_cache_size=2
+        )
+        
+        # Mock successful clones
+        mock_repo_class.clone_from.return_value = Mock(spec=Repo)
+        
+        # Add 3 repositories (should evict oldest)
+        url1 = "https://github.com/user/repo1.git"
+        url2 = "https://github.com/user/repo2.git"
+        url3 = "https://github.com/user/repo3.git"
+        
+        manager.get_or_clone_repository(url1)
+        time.sleep(0.01)  # Ensure different timestamps
+        manager.get_or_clone_repository(url2)
+        time.sleep(0.01)
+        manager.get_or_clone_repository(url3)
+        
+        stats = manager.get_cache_stats()
+        
+        # Should only have 2 entries (oldest evicted)
+        assert stats["size"] == 2
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_warm_cache_success(self, mock_repo_class, manager):
+        """Test warming cache with multiple repositories."""
+        urls = [
+            "https://github.com/user/repo1.git",
+            "https://github.com/user/repo2.git",
+            "https://github.com/user/repo3.git"
+        ]
+        
+        # Mock successful clones
+        mock_repo_class.clone_from.return_value = Mock(spec=Repo)
+        
+        warmed = manager.warm_cache(urls)
+        
+        assert warmed == 3
+        stats = manager.get_cache_stats()
+        assert stats["size"] == 3
+    
+    @patch('git_commit_mcp.repository_manager.Repo')
+    def test_warm_cache_partial_failure(self, mock_repo_class, manager):
+        """Test warming cache with some failures."""
+        urls = [
+            "https://github.com/user/repo1.git",
+            "https://github.com/user/repo2.git",
+            "https://github.com/user/repo3.git"
+        ]
+        
+        # Mock: first succeeds, second fails, third succeeds
+        mock_repo_class.clone_from.side_effect = [
+            Mock(spec=Repo),
+            GitCommandError(command=['git', 'clone'], status=1, stderr="Failed"),
+            Mock(spec=Repo)
+        ]
+        
+        warmed = manager.warm_cache(urls)
+        
+        assert warmed == 2
+        stats = manager.get_cache_stats()
+        assert stats["size"] == 2
+    
+    def test_cleanup_workspace_removes_from_cache(self, manager):
+        """Test that cleanup_workspace also removes from cache."""
+        from git_commit_mcp.repository_manager import CachedRepository
+        
+        repo_id = "test_repo_id"
+        repo_path = manager.workspace_dir / repo_id
+        repo_path.mkdir(parents=True)
+        
+        # Add to cache
+        mock_repo = Mock(spec=Repo)
+        cached = CachedRepository(
+            repo=mock_repo,
+            repo_id=repo_id,
+            repo_url="https://github.com/user/repo.git"
+        )
+        
+        with manager._cache_lock:
+            manager._cache[repo_id] = cached
+        
+        assert repo_id in manager._cache
+        
+        manager.cleanup_workspace(repo_id)
+        
+        assert repo_id not in manager._cache
+        assert not repo_path.exists()
+    
+    def test_cleanup_all_workspaces_clears_cache(self, manager):
+        """Test that cleanup_all_workspaces clears the cache."""
+        from git_commit_mcp.repository_manager import CachedRepository
+        
+        # Add entries to cache
+        mock_repo = Mock(spec=Repo)
+        cached = CachedRepository(
+            repo=mock_repo,
+            repo_id="test_id",
+            repo_url="https://github.com/user/repo.git"
+        )
+        
+        with manager._cache_lock:
+            manager._cache["test_id"] = cached
+        
+        assert len(manager._cache) == 1
+        
+        manager.cleanup_all_workspaces()
+        
+        assert len(manager._cache) == 0
