@@ -78,7 +78,7 @@ class CommitMessageGenerator:
             header = f"{commit_type}: "
         
         # Create a short description based on the changes
-        description = self._create_description(changes, commit_type)
+        description = self._create_description(changes, commit_type, repo)
         
         # Ensure description fits within max_summary_lines
         description_lines = description.split('\n')
@@ -293,7 +293,62 @@ class CommitMessageGenerator:
         
         return bullets
     
-    def _create_description(self, changes: ChangeSet, commit_type: str) -> str:
+    def _analyze_diff_for_keywords(self, repo: Repo, changes: ChangeSet) -> List[str]:
+        """Analyze diff content to extract meaningful keywords about what changed.
+        
+        Args:
+            repo: GitPython Repo object
+            changes: ChangeSet containing all file changes
+            
+        Returns:
+            List of keywords found in the diff
+        """
+        keywords = []
+        
+        try:
+            # Get the diff for staged changes
+            diff_text = repo.git.diff('--cached', '--unified=0')
+            
+            # Look for common patterns that indicate what was changed
+            patterns = {
+                'caching': ['cache', 'cached', 'caching', 'ttl', 'evict'],
+                'authentication': ['auth', 'token', 'credential', 'login', 'password'],
+                'logging': ['log', 'logger', 'logging'],
+                'configuration': ['config', 'setting', 'option'],
+                'error handling': ['error', 'exception', 'try', 'catch', 'raise'],
+                'testing': ['test', 'assert', 'mock', 'fixture'],
+                'documentation': ['doc', 'readme', 'comment'],
+                'API': ['endpoint', 'route', 'api', 'request', 'response'],
+                'database': ['db', 'database', 'query', 'sql'],
+                'performance': ['optimize', 'performance', 'speed', 'fast'],
+                'security': ['security', 'secure', 'vulnerability', 'sanitize'],
+                'validation': ['validate', 'validation', 'check', 'verify'],
+                'refactoring': ['refactor', 'restructure', 'reorganize'],
+                'bug fix': ['fix', 'bug', 'issue', 'problem', 'resolve'],
+            }
+            
+            diff_lower = diff_text.lower()
+            
+            for keyword, terms in patterns.items():
+                if any(term in diff_lower for term in terms):
+                    keywords.append(keyword)
+            
+            # Look for function/class definitions to understand what was added
+            if 'def ' in diff_text or 'class ' in diff_text:
+                import re
+                # Find new function/class names
+                new_defs = re.findall(r'^\+.*?(?:def|class)\s+(\w+)', diff_text, re.MULTILINE)
+                if new_defs:
+                    # Take first few function/class names
+                    keywords.extend(new_defs[:2])
+            
+        except Exception:
+            # If diff analysis fails, return empty list
+            pass
+        
+        return keywords[:3]  # Return top 3 keywords
+    
+    def _create_description(self, changes: ChangeSet, commit_type: str, repo: Repo) -> str:
         """Create a short description for the commit header.
         
         Generates a concise description based on the type and nature of changes.
@@ -301,15 +356,23 @@ class CommitMessageGenerator:
         Args:
             changes: ChangeSet containing all file changes
             commit_type: The detected commit type
+            repo: GitPython Repo object for diff analysis
             
         Returns:
-            Short description string
+            Short description string (1-2 lines)
         """
         total_files = changes.total_files()
         
-        # Create type-specific descriptions
+        # Analyze diff for keywords
+        keywords = self._analyze_diff_for_keywords(repo, changes)
+        
+        # Create type-specific descriptions with keywords
         if commit_type == 'feat':
-            if changes.added:
+            if keywords:
+                # Use keywords to describe the feature
+                keyword_str = ', '.join(keywords[:2])
+                return f"Implement {keyword_str}"
+            elif changes.added:
                 # Focus on what was added
                 first_file = Path(changes.added[0]).stem.replace('_', ' ').replace('-', ' ')
                 if len(changes.added) == 1:
@@ -319,31 +382,46 @@ class CommitMessageGenerator:
             return "Add new functionality"
         
         elif commit_type == 'fix':
+            if keywords:
+                keyword_str = ' '.join(keywords[:2])
+                return f"Fix {keyword_str}"
             return f"Fix issues in {total_files} file{'s' if total_files != 1 else ''}"
         
         elif commit_type == 'docs':
+            if keywords:
+                return f"Update documentation for {keywords[0]}"
             return "Update documentation"
         
         elif commit_type == 'test':
-            # Check if there are significant source file changes too
-            source_files = [f for f in changes.modified + changes.added 
-                          if any(src in f.lower() for src in ['src/', 'lib/', 'app/']) 
-                          and 'test' not in f.lower()]
-            if source_files and len(source_files) >= len(changes.added):
-                # More source changes than test changes, describe the source changes
-                return f"Update {total_files} file{'s' if total_files != 1 else ''}"
+            if keywords and 'testing' not in keywords:
+                # Describe what's being tested
+                return f"Add tests for {keywords[0]}"
             return "Update tests"
         
         elif commit_type == 'style':
             return "Update styles"
         
         elif commit_type == 'refactor':
+            if keywords:
+                keyword_str = ' and '.join(keywords[:2])
+                return f"Refactor {keyword_str}"
+            # Try to be more specific about what was refactored
+            if changes.modified:
+                file_names = [Path(f).stem.replace('_', ' ') for f in changes.modified[:2]]
+                if len(file_names) == 1:
+                    return f"Refactor {file_names[0]}"
+                else:
+                    return f"Refactor {file_names[0]} and {file_names[1]}"
             return f"Refactor {total_files} file{'s' if total_files != 1 else ''}"
         
         elif commit_type == 'chore':
             if any('package' in f.lower() or 'pyproject' in f.lower() for f in changes.modified + changes.added):
                 return "Update dependencies"
+            if keywords:
+                return f"Update {keywords[0]}"
             return "Update configuration"
         
-        # Default fallback
+        # Default fallback with keywords if available
+        if keywords:
+            return f"Update {keywords[0]}"
         return f"Update {total_files} file{'s' if total_files != 1 else ''}"
