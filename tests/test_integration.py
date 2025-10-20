@@ -81,8 +81,17 @@ class TestIntegrationWorkflow:
         
         # Step 4: Verify commit exists in repository
         repo = Repo(test_repo)
+        # Note: The latest commit is the changelog commit, so we check the parent
+        # The returned commit_hash is the main commit (before changelog commit)
         latest_commit = repo.head.commit
-        assert latest_commit.hexsha == result["commit_hash"]
+        # The main commit should be either HEAD or HEAD~1 (if changelog was committed)
+        if result["changelog_updated"]:
+            # If changelog was updated, the main commit is the parent of HEAD
+            main_commit = latest_commit.parents[0] if latest_commit.parents else latest_commit
+            assert main_commit.hexsha == result["commit_hash"]
+        else:
+            # If no changelog commit, HEAD should be the main commit
+            assert latest_commit.hexsha == result["commit_hash"]
         
         # Step 5: Verify changelog was updated
         changelog_path = test_repo / "CHANGELOG.md"
@@ -143,7 +152,12 @@ class TestIntegrationWorkflow:
         # Verify all files are in the commit
         repo = Repo(test_repo)
         latest_commit = repo.head.commit
-        committed_files = list(latest_commit.stats.files.keys())
+        # If changelog was updated, check the parent commit (main commit)
+        if result["changelog_updated"] and latest_commit.parents:
+            main_commit = latest_commit.parents[0]
+            committed_files = list(main_commit.stats.files.keys())
+        else:
+            committed_files = list(latest_commit.stats.files.keys())
         assert "src/module.py" in committed_files
         assert "README.md" in committed_files
         assert "config.json" in committed_files
@@ -189,7 +203,12 @@ class TestIntegrationWorkflow:
         
         # Verify file is deleted in commit
         latest_commit = repo.head.commit
-        assert "temp.txt" in latest_commit.stats.files
+        # If changelog was updated, check the parent commit (main commit)
+        if result["changelog_updated"] and latest_commit.parents:
+            main_commit = latest_commit.parents[0]
+            assert "temp.txt" in main_commit.stats.files
+        else:
+            assert "temp.txt" in latest_commit.stats.files
     
     def test_changelog_format_and_ordering(self, test_repo):
         """Test that changelog maintains proper format and chronological order."""
