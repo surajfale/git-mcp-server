@@ -306,8 +306,8 @@ class CommitMessageGenerator:
         keywords = []
         
         try:
-            # Get the diff for staged changes
-            diff_text = repo.git.diff('--cached', '--unified=0')
+            # Get the diff for unstaged changes (HEAD vs working directory)
+            diff_text = repo.git.diff('HEAD', '--unified=0')
             
             # Look for common patterns that indicate what was changed
             patterns = {
@@ -325,6 +325,8 @@ class CommitMessageGenerator:
                 'validation': ['validate', 'validation', 'check', 'verify'],
                 'refactoring': ['refactor', 'restructure', 'reorganize'],
                 'bug fix': ['fix', 'bug', 'issue', 'problem', 'resolve'],
+                'commit message': ['commit', 'message', 'description'],
+                'CHANGELOG': ['changelog'],
             }
             
             diff_lower = diff_text.lower()
