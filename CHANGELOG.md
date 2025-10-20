@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 13:56:11 - 6fc0b2e [LOCAL]
+### 2025-10-20 14:17:34 - 2093d60 [LOCAL]
+
+chore: Update logging
+
+- Add .railwayignore
+- Add Procfile
+- Add test_commit_push.py
+- Remove test_final.py
+- Update railway.json### 2025-10-20 13:56:11 - 6fc0b2e [LOCAL]
 
 chore: Update testing
 
