@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 00:37:47 - 53892e5 [LOCAL]
+### 2025-10-20 00:56:27 - 9e36f40 [LOCAL]
+
+test(git-commit-mcp): Update tests
+
+- Add authentication.md
+- Add auth_example.py
+- Add auth.py
+- Add repository_manager.py
+- Add test_auth.py### 2025-10-20 00:37:47 - 53892e5 [LOCAL]
 
 test(.kiro): Update tests
 
