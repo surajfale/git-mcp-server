@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 13:55:33 - 72153a9 [LOCAL]
+### 2025-10-20 13:56:11 - 6fc0b2e [LOCAL]
+
+chore: Update testing
+
+- Add test_final.py
+- Remove test_message.py### 2025-10-20 13:55:33 - 72153a9 [LOCAL]
 
 refactor(git-commit-mcp): Refactor caching and logging
 
