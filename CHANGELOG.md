@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 08:31:02 - 25eacc4 [LOCAL]
+### 2025-10-20 08:33:00 - 520531e [LOCAL]
+
+test: Update tests
+
+- Update test_metrics.py### 2025-10-20 08:31:02 - 25eacc4 [LOCAL]
 
 refactor(git-commit-mcp): Refactor 1 file
 
