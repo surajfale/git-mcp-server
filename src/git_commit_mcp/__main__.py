@@ -78,10 +78,9 @@ def main():
             )
             # Use FastMCP's built-in SSE transport with custom health endpoint
             from git_commit_mcp.server import mcp
-            from fastmcp.server.sse import create_sse_server
             
-            # Create the SSE server app
-            app = create_sse_server(mcp)
+            # Get the SSE app from FastMCP
+            app = mcp.sse_app()
             
             # Add health check endpoint for Railway
             @app.get("/health")
