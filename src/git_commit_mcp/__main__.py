@@ -76,16 +76,13 @@ def main():
                     "tls_enabled": config.tls_enabled
                 }
             )
-            # Import here to avoid loading FastAPI dependencies in stdio mode
-            try:
-                from git_commit_mcp.http_server import run_http_server
-                run_http_server(config)
-            except ImportError as e:
-                logger.error(
-                    "Failed to import HTTP server dependencies",
-                    extra={"error": str(e)}
-                )
-                sys.exit(2)
+            # Use FastMCP's built-in HTTP transport with SSE
+            from git_commit_mcp.server import mcp
+            mcp.run(
+                transport="sse",
+                host=config.http_host,
+                port=config.http_port
+            )
         else:
             logger.error(
                 "Unknown transport mode",
