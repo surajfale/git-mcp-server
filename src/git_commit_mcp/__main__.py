@@ -78,19 +78,29 @@ def main():
             )
             # Use FastMCP's modern HTTP transport with custom health endpoint
             from git_commit_mcp.server import mcp
+            from starlette.responses import JSONResponse
+            from starlette.routing import Route, Mount
             
-            # Get the HTTP app from FastMCP (modern non-SSE alternative)
-            app = mcp.http_app()
+            # Get the HTTP app from FastMCP
+            mcp_app = mcp.http_app()
             
-            # Add health check endpoint for Railway
-            @app.get("/health")
-            async def health_check():
-                return {
+            # Create health check endpoint
+            async def health_check(request):
+                return JSONResponse({
                     "status": "healthy",
                     "version": "1.0.0",
                     "transport": "http",
                     "server": "git-commit-mcp"
-                }
+                })
+            
+            # Mount the MCP app and add health route
+            from starlette.applications import Starlette
+            app = Starlette(
+                routes=[
+                    Route("/health", health_check),
+                    Mount("/", app=mcp_app)
+                ]
+            )
             
             # Run with uvicorn
             import uvicorn
