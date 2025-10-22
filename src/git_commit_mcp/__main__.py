@@ -76,11 +76,11 @@ def main():
                     "tls_enabled": config.tls_enabled
                 }
             )
-            # Use FastMCP's built-in SSE transport with custom health endpoint
+            # Use FastMCP's modern HTTP transport with custom health endpoint
             from git_commit_mcp.server import mcp
             
-            # Get the SSE app from FastMCP
-            app = mcp.sse_app()
+            # Get the HTTP app from FastMCP (modern non-SSE alternative)
+            app = mcp.http_app()
             
             # Add health check endpoint for Railway
             @app.get("/health")
@@ -88,7 +88,7 @@ def main():
                 return {
                     "status": "healthy",
                     "version": "1.0.0",
-                    "transport": "sse",
+                    "transport": "http",
                     "server": "git-commit-mcp"
                 }
             
