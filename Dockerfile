@@ -18,9 +18,9 @@ RUN apt-get update && apt-get install -y \
 # Copy application code
 COPY . /app
 
-# Install Python dependencies
-# Using pip install -e . for editable install as per project standards
-RUN pip install --no-cache-dir -e .
+# Install Python dependencies with remote extras for HTTP server
+# Using pip install -e .[remote] to include FastAPI, uvicorn, etc.
+RUN pip install --no-cache-dir -e ".[remote]"
 
 # Create workspace directory for cloning repositories
 # Railway volumes will mount to /data for persistence

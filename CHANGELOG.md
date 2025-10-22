@@ -4,7 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-20 14:30:05 - b793bd4 [LOCAL]
+### 2025-10-21 22:41:22 - 3b87f38 [LOCAL]
+
+chore: Update caching
+
+- Remove push_fix.py
+- Update Dockerfile### 2025-10-20 14:30:05 - b793bd4 [PUSHED]
 
 chore(git-commit-mcp): Update logging
 
