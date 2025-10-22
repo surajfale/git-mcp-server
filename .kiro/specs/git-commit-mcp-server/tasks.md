@@ -204,318 +204,83 @@
   - Test MCP protocol compliance
   - _Requirements: All requirements_
 
-- [-] 10. Implement configuration management for multi-mode deployment
+- [x] 10. Simplify configuration for stdio-only mode
 
-
-  - [x] 10.1 Create configuration module in `config.py`
-
-
-
-    - Write `ServerConfig` dataclass with all configuration fields (transport, HTTP, auth, TLS, repository, monitoring)
+  - [x] 10.1 Simplify configuration module in `config.py`
+    - Simplified `ServerConfig` dataclass to stdio-only fields
+    - Removed HTTP, auth, TLS, CORS settings
+    - Kept essential fields: repo path, bullet points, changelog, workspace, Git credentials, logging
     - Implement `from_env()` class method to load configuration from environment variables
-    - Add validation logic for configuration values (e.g., port ranges, file paths)
+    - Add validation logic for configuration values
     - Support loading from `.env` file using python-dotenv
-    - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5_
   
   - [x] 10.2 Write unit tests for configuration
-
-
-
-
-
-
-
-
-
-
     - Create `tests/test_config.py` with tests for environment variable loading
     - Test configuration validation and error handling
-    - _Requirements: 7.1, 7.5_
 
-- [x] 11. Implement authentication and security layer
+- [REMOVED] 11. Authentication and security layer (HTTP-only feature removed)
 
-
-
-
-  - [x] 11.1 Create authentication module in `auth.py`
-
-
-    - Write `TokenValidator` class for bearer token validation
-    - Implement JWT token support with expiration checking
-    - Write `verify_token()` function for FastAPI dependency injection
-    - Add rate limiting logic (token bucket algorithm)
-    - _Requirements: 6.3, 6.4_
-  
-  - [x] 11.2 Write unit tests for authentication
-
-
-
-
-
-
-    - Create `tests/test_auth.py` with tests for token validation
-    - Test JWT token generation and verification
-    - Test rate limiting behavior
-    - _Requirements: 6.3, 6.4_
--
-
-- [ ] 12. Implement Repository Manager for remote Git access
+- [x] 12. Repository Manager for Git access
 
   - [x] 12.1 Create RepositoryManager class in `repository_manager.py`
-
-
-
     - Write `get_or_clone_repository()` method to clone repos to workspace
     - Implement `get_local_repository()` method for existing local repos
     - Write `cleanup_workspace()` method to remove cloned repos
     - Implement `configure_ssh_key()` method for SSH authentication setup
     - Add support for HTTPS authentication with username/password and tokens
     - Implement workspace locking for concurrent access control
-    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
   
   - [x] 12.2 Write unit tests for RepositoryManager
-
-
-
-
-
-
     - Create `tests/test_repository_manager.py` with mocked Git operations
     - Test repository cloning with SSH and HTTPS
     - Test workspace cleanup and locking
-    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [x] 13. Implement HTTP/SSE transport layer
+- [REMOVED] 13. HTTP/SSE transport layer (removed for stdio-only focus)
 
+- [x] 14. Simplify main server for stdio-only operation
 
-
-
-  - [x] 13.1 Create HTTP server in `http_server.py`
-
-
-    - Initialize FastAPI application with CORS middleware
-    - Implement `/health` endpoint for health checks
-    - Implement `/mcp/tools/git_commit_and_push` POST endpoint with authentication
-    - Implement `/mcp/sse` GET endpoint for Server-Sent Events
-    - Add error handling middleware for consistent error responses
-    - Integrate authentication dependency on protected endpoints
-    - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.2, 7.3, 7.4, 9.2, 9.3, 9.5_
+  - [x] 14.1 Keep `server.py` for stdio mode
+    - Core tool logic in reusable functions
+    - FastMCP integration for stdio transport
+    - Server runs in stdio mode only
   
-  - [x] 13.2 Create transport abstraction in `transport.py`
-
-
-    - Write `TransportHandler` base class for transport abstraction
-    - Implement `StdioTransport` class for local mode
-    - Implement `HttpTransport` class for remote mode
-    - Add transport factory function to select appropriate transport
-    - _Requirements: 6.1, 6.2, 6.5_
-  
-  - [x] 13.3 Write integration tests for HTTP server
-
-
-
-
-
-
-
-
-
-    - Create `tests/test_http_server.py` with httpx test client
-    - Test health check endpoint
-    - Test authenticated and unauthenticated requests
-    - Test CORS headers
-    - Test SSE connection
-    - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.2, 7.3_
-
-- [x] 14. Update main server to support dual-mode operation
-
-
-
-
-  - [x] 14.1 Refactor `server.py` for stdio mode
-
-
-    - Extract core tool logic into reusable functions
-    - Keep FastMCP integration for stdio transport
-    - Ensure server can run independently in stdio mode
-    - _Requirements: 6.5_
-  
-  - [x] 14.2 Create unified entry point in `__main__.py`
-
-
+  - [x] 14.2 Simplify entry point in `__main__.py`
     - Write `main()` function that reads configuration
-    - Implement mode selection logic (stdio vs http)
-    - Call appropriate server runner based on transport mode
+    - Removed mode selection logic (stdio only)
+    - Call stdio server runner
     - Add logging setup and error handling
-    - _Requirements: 6.1, 6.5, 7.1, 7.5, 9.3_
   
-  - [x] 14.3 Update tool implementation to work with both transports
+  - [x] 14.3 Tool implementation for stdio transport
+    - `git_commit_and_push` works with RepositoryManager
+    - Support for remote repository URLs in addition to local paths
+    - Consistent error handling
 
+- [REMOVED] 15. Docker containerization for Railway (removed)
 
-    - Modify `git_commit_and_push` to work with RepositoryManager
-    - Add support for remote repository URLs in addition to local paths
-    - Ensure error handling works consistently across transports
-    - _Requirements: 6.1, 6.5, 8.1, 8.5_
+- [REMOVED] 16. Railway deployment configuration (removed)
 
-- [x] 15. Create Docker containerization for Railway
+- [REMOVED] 17. Railway hosting documentation (removed)
 
+- [x] 18. Prepare for PyPI publication
 
-
-
-  - [x] 15.1 Write Dockerfile optimized for Railway
-
-
-    - Create Dockerfile with Python 3.11 slim base
-    - Install system dependencies (git, openssh-client)
-    - Copy application code and install Python dependencies with `pip install -e .`
-    - Create workspace directory at `/data/git-workspaces` with proper permissions
-    - Set environment variables (TRANSPORT_MODE=http, HTTP_HOST=0.0.0.0, WORKSPACE_DIR=/data/git-workspaces)
-    - Expose port 8000 and add HEALTHCHECK for Railway monitoring
-    - Define CMD to run `python -m git_commit_mcp`
-    - _Requirements: 9.1, 10.1_
+  - [x] 18.1 Update pyproject.toml for PyPI
+    - Add proper metadata (author, license, keywords, classifiers)
+    - Add project URLs (homepage, repository, issues, documentation)
+    - Keep core dependencies (FastMCP, GitPython, python-dotenv)
+    - _Requirements: 8.1, 8.2, 8.4_
   
-
-  - [x] 15.2 Update config to support Railway's PORT environment variable
-
-    - Modify `config.py` to read `PORT` env var with fallback to `HTTP_PORT`
-    - Ensure port binding works with Railway's dynamic port assignment
-    - _Requirements: 10.6_
+  - [x] 18.2 Create LICENSE file
+    - Add MIT license
+    - _Requirements: 8.4_
   
-
-  - [x] 15.3 Create .env.example file for Railway
-
-    - Document all required environment variables (TRANSPORT_MODE, MCP_AUTH_TOKEN, WORKSPACE_DIR)
-    - Document optional variables (GIT_SSH_KEY_PATH, GIT_USERNAME, GIT_TOKEN, CORS_ORIGINS)
-    - Add Railway-specific notes about PORT variable
-    - Include comments explaining usage and Railway volume configuration
-    - _Requirements: 7.1, 10.6_
-
-- [x] 16. Create Railway deployment configuration
-
-
-
-
-  - [x] 16.1 Create railway.json configuration file
-
-
-    - Define build configuration with DOCKERFILE builder
-    - Set dockerfilePath to "Dockerfile"
-    - Configure deploy settings with startCommand, healthcheckPath, and restart policy
-    - Set healthcheckTimeout and restartPolicyMaxRetries
-    - _Requirements: 10.5_
+  - [x] 18.3 Create MANIFEST.in
+    - Include README.md, LICENSE, pyproject.toml
+    - Include all source files
+    - _Requirements: 8.1_
   
-  - [x] 16.2 Create deployment documentation in `docs/railway-deployment.md`
-
-
-    - Document Railway volume setup (mount path: /data, size: 2-5 GB)
-    - List all required environment variables with Railway-specific values
-    - Provide step-by-step deployment instructions
-    - Include screenshots or CLI commands for Railway setup
-    - Document how to configure custom domain
-    - _Requirements: 10.2, 10.5, 10.6_
-  
-  - [x] 16.3 Add workspace cleanup mechanism
-
-
-    - Implement cleanup endpoint or scheduled task to prevent disk exhaustion
-    - Add configuration for maximum workspace size
-    - Document cleanup strategy in deployment docs
-    - _Requirements: 10.7_
-
-- [-] 17. Update documentation for Railway hosting
-
-
-
-  - [x] 17.1 Update README.md with Railway deployment section
-
-    - Add "Deployment to Railway" section with quick start
-    - Document Railway Hobby plan requirements
-    - Add Railway badge and deployment button
-    - Include client configuration examples for Railway-hosted server
-    - Link to detailed Railway deployment guide
-    - _Requirements: 10.1, 10.5_
-  
-
-  - [x] 17.2 Create Railway troubleshooting guide
-
-    - Document common Railway deployment issues (volume mounting, port binding, environment variables)
-    - Add authentication troubleshooting for Railway URLs
-    - Include Railway-specific logging and monitoring tips
-    - Document how to check Railway volume usage
-    - _Requirements: 6.3, 6.4, 7.5, 8.4, 10.2_
-  
-  - [x] 17.3 Add API documentation for remote clients
-
-
-
-
-
-
-
-    - Document HTTP endpoints with request/response examples
-    - Add authentication header format for Railway deployment
-    - Include Railway URL format and custom domain setup
-    - Document health check endpoint for Railway monitoring
-    - _Requirements: 6.1, 6.2, 6.3_
-
-
-
-
-
-
-- [x] 18. Add monitoring and observability
-
-
-
-
-  - [x] 18.1 Implement metrics endpoint
-
-
-
-
-
-    - Add `/metrics` endpoint with Prometheus-compatible metrics
-    - Track request counts, latencies, and error rates
-    - Track Git operation metrics (commits, pushes, failures)
-    - _Requirements: 9.5_
-  
-  - [x] 18.2 Enhance logging
-
-
-
-
-
-    - Add structured logging with JSON format
-    - Include request IDs for tracing
-    - Log all Git operations with outcomes
-    - Add audit logging for security events
-    - _Requirements: 9.3_
-
-- [x] 19. Performance optimization and testing
-
-
-
-
-
-
-
-  - [x] 19.1 Implement repository caching
-
-
-    - Add caching layer for cloned repositories
-    - Implement TTL-based cache eviction
-    - Add cache warming for frequently accessed repos
-    - _Requirements: 8.5, 9.4_
-  
-  - [ ]* 19.2 Add load testing
-    - Create load test scripts using locust or k6
-    - Test concurrent client connections
-    - Measure performance under load
-    - _Requirements: 7.4_
-  
-  - [ ]* 19.3 Add end-to-end remote deployment tests
-    - Test Docker container deployment
-    - Test authentication flow
-    - Test remote repository access
-    - Verify health checks and metrics
-    - _Requirements: All remote hosting requirements_
+  - [x] 18.4 Build and validate package
+    - Install build tools (build, twine)
+    - Build distribution packages (wheel and sdist)
+    - Verify package with twine check
+    - Test installation with uvx
+    - _Requirements: 8.1, 8.3, 8.5_

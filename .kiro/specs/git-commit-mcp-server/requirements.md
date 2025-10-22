@@ -83,31 +83,17 @@ This document specifies the requirements for a Model Context Protocol (MCP) serv
 
 ### Requirement 6
 
-**User Story:** As a developer, I want to host the MCP server remotely, so that I can access Git automation from any client without local installation.
+**User Story:** As a developer, I want to use the MCP server locally via stdio transport, so that I can integrate it with my AI assistant.
 
 #### Acceptance Criteria
 
-1. WHEN the server is started in remote mode, THE MCP Server SHALL listen for HTTP connections on a configurable port
-2. WHEN the server is started in remote mode, THE MCP Server SHALL support Server-Sent Events (SSE) for streaming responses
-3. WHEN a client connects to the remote server, THE MCP Server SHALL validate the authentication token before processing requests
-4. WHEN an invalid authentication token is provided, THE MCP Server SHALL reject the connection with an authentication error
-5. WHEN the server is started in local mode, THE MCP Server SHALL use stdio transport for communication
+1. WHEN the server is started, THE MCP Server SHALL use stdio transport for communication
+2. WHEN the server starts, THE MCP Server SHALL read configuration from environment variables or a configuration file
+3. WHEN the server encounters a configuration error, THE MCP Server SHALL log the error and fail to start with a clear error message
 
 ### Requirement 7
 
-**User Story:** As a system administrator, I want to configure the server for different deployment environments, so that I can deploy to cloud platforms or traditional servers.
-
-#### Acceptance Criteria
-
-1. WHEN the server starts, THE MCP Server SHALL read configuration from environment variables or a configuration file
-2. WHEN configured for remote hosting, THE MCP Server SHALL support HTTPS with TLS certificates for secure communication
-3. WHEN configured for remote hosting, THE MCP Server SHALL allow configuration of CORS headers for web-based clients
-4. WHEN configured for remote hosting, THE MCP Server SHALL support multiple concurrent client connections
-5. WHEN the server encounters a configuration error, THE MCP Server SHALL log the error and fail to start with a clear error message
-
-### Requirement 8
-
-**User Story:** As a developer, I want the remote server to access my Git repositories securely, so that I can perform Git operations on repositories hosted on remote servers.
+**User Story:** As a developer, I want the server to access my Git repositories securely, so that I can perform Git operations on both local and remote repositories.
 
 #### Acceptance Criteria
 
@@ -115,30 +101,16 @@ This document specifies the requirements for a Model Context Protocol (MCP) serv
 2. WHEN accessing a remote Git repository, THE MCP Server SHALL support SSH key-based authentication
 3. WHEN accessing a remote Git repository, THE MCP Server SHALL support HTTPS authentication with credentials
 4. WHEN repository access fails due to authentication, THE MCP Server SHALL return a clear error message indicating the authentication failure
-5. WHEN the server is deployed remotely, THE MCP Server SHALL support cloning repositories to a temporary workspace before performing operations
+5. WHEN a remote repository URL is provided, THE MCP Server SHALL support cloning repositories to a temporary workspace before performing operations
 
-### Requirement 9
+### Requirement 8
 
-**User Story:** As a developer, I want to deploy the MCP server to cloud platforms easily, so that I can leverage managed infrastructure for hosting.
-
-#### Acceptance Criteria
-
-1. WHEN deploying to a cloud platform, THE MCP Server SHALL provide a Docker container image for containerized deployment
-2. WHEN deploying to a cloud platform, THE MCP Server SHALL support health check endpoints for load balancer integration
-3. WHEN deploying to a cloud platform, THE MCP Server SHALL log all operations to stdout for centralized logging systems
-4. WHEN deploying to serverless platforms, THE MCP Server SHALL support stateless operation with external repository storage
-5. WHEN the server starts, THE MCP Server SHALL expose metrics for monitoring and observability
-
-### Requirement 10
-
-**User Story:** As a developer, I want to deploy the MCP server to Railway with persistent storage, so that cloned repositories persist across deployments and restarts.
+**User Story:** As a developer, I want to publish the MCP server to PyPI, so that others can easily install and use it with uvx.
 
 #### Acceptance Criteria
 
-1. WHEN deploying to Railway, THE MCP Server SHALL provide a Dockerfile optimized for Railway deployment
-2. WHEN deploying to Railway, THE MCP Server SHALL support Railway's volume mounting for persistent workspace storage
-3. WHEN the server starts on Railway, THE MCP Server SHALL create the workspace directory if it does not exist
-4. WHEN Railway restarts the service, THE MCP Server SHALL reuse existing cloned repositories from the persistent volume
-5. WHEN deploying to Railway, THE MCP Server SHALL provide a railway.json configuration file for automated deployment
-6. WHEN deploying to Railway, THE MCP Server SHALL read all configuration from Railway environment variables
-7. WHEN the workspace directory is on a persistent volume, THE MCP Server SHALL implement proper cleanup mechanisms to prevent disk space exhaustion
+1. WHEN the package is published to PyPI, THE package SHALL include all necessary dependencies
+2. WHEN the package is installed, THE package SHALL provide a command-line entry point (git-commit-mcp)
+3. WHEN the package is installed with uvx, THE server SHALL run without additional configuration
+4. WHEN the package metadata is viewed, THE package SHALL include proper author, license, and project information
+5. WHEN the package is built, THE build SHALL pass validation checks (twine check)
