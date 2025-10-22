@@ -76,12 +76,30 @@ def main():
                     "tls_enabled": config.tls_enabled
                 }
             )
-            # Use FastMCP's built-in HTTP transport with SSE
+            # Use FastMCP's built-in SSE transport with custom health endpoint
             from git_commit_mcp.server import mcp
-            mcp.run(
-                transport="sse",
+            from fastmcp.server.sse import create_sse_server
+            
+            # Create the SSE server app
+            app = create_sse_server(mcp)
+            
+            # Add health check endpoint for Railway
+            @app.get("/health")
+            async def health_check():
+                return {
+                    "status": "healthy",
+                    "version": "1.0.0",
+                    "transport": "sse",
+                    "server": "git-commit-mcp"
+                }
+            
+            # Run with uvicorn
+            import uvicorn
+            uvicorn.run(
+                app,
                 host=config.http_host,
-                port=config.http_port
+                port=config.http_port,
+                log_level=config.log_level.lower()
             )
         else:
             logger.error(
