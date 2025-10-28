@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-21 22:41:22 - 3b87f38 [PUSHED]
+### 2025-10-28 00:08:58 - e9ec4b6 [LOCAL]
+
+feat(docs): enhance documentation and restructure project files
+
+- Added new architecture and usage documentation
+- Introduced Copilot instructions for better onboarding
+- Removed outdated specifications and steering documents### 2025-10-21 22:41:22 - 3b87f38 [PUSHED]
 
 chore: Update caching
 

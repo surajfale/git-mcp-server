@@ -38,9 +38,19 @@ class ServerConfig:
     ssh_key_path: Optional[str] = None
     git_username: Optional[str] = None
     git_token: Optional[str] = None
+    force_ssh_only: bool = True
     
     # Logging settings
     log_level: str = "INFO"
+
+    # AI settings
+    enable_ai: bool = True
+    ai_provider: str = "openai"  # currently only openai path implemented
+    ai_model: str = "gpt-4o-mini"
+    ai_temperature: float = 0.2
+    ai_max_tokens: int = 400
+    ai_timeout_seconds: int = 30
+    ai_base_url: Optional[str] = None  # for OpenAI-compatible endpoints (e.g., Ollama/LM Studio)
     
     @classmethod
     def from_env(cls, env_file: Optional[str] = None) -> "ServerConfig":
@@ -67,6 +77,14 @@ class ServerConfig:
             git_username=os.getenv("GIT_USERNAME"),
             git_token=os.getenv("GIT_TOKEN"),
             log_level=os.getenv("LOG_LEVEL", "INFO").upper(),
+            force_ssh_only=os.getenv("FORCE_SSH_ONLY", "true").lower() == "true",
+            enable_ai=os.getenv("ENABLE_AI", "true").lower() == "true",
+            ai_provider=os.getenv("AI_PROVIDER", "openai"),
+            ai_model=os.getenv("AI_MODEL", "gpt-4o-mini"),
+            ai_temperature=float(os.getenv("AI_TEMPERATURE", "0.2")),
+            ai_max_tokens=int(os.getenv("AI_MAX_TOKENS", "400")),
+            ai_timeout_seconds=int(os.getenv("AI_TIMEOUT_SECONDS", "30")),
+            ai_base_url=os.getenv("AI_BASE_URL") or None,
         )
         
         # Validate configuration
@@ -113,3 +131,10 @@ class ServerConfig:
                 raise ValueError(
                     f"SSH key path is not a file: {self.ssh_key_path}"
                 )
+
+        # Validate AI settings
+        if self.enable_ai:
+            if self.ai_provider != "openai":
+                raise ValueError("Only 'openai' AI_PROVIDER is supported currently")
+            if not self.ai_model:
+                raise ValueError("AI model must be specified when ENABLE_AI=true")

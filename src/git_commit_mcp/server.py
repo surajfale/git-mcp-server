@@ -19,8 +19,9 @@ from git_commit_mcp.repository_manager import RepositoryManager, GitCredentials
 from git_commit_mcp.logging_config import (
     get_logger,
     log_git_operation,
-    log_security_event
+    setup_logging
 )
+from git_commit_mcp.ai_client import AIClient
 
 # Get logger for this module
 logger = get_logger(__name__)
@@ -28,8 +29,8 @@ logger = get_logger(__name__)
 # Initialize FastMCP server
 mcp = FastMCP("git-commit-server")
 
-# Initialize configuration (can be overridden by loading from environment)
-config = ServerConfig()
+# Initialize configuration from environment so MCP launch picks up settings
+config = ServerConfig.from_env()
 
 # Initialize repository manager (lazy initialization)
 _repo_manager: Optional[RepositoryManager] = None
@@ -110,6 +111,12 @@ def execute_git_commit_and_push(
             repository_path.startswith("git@") or
             repository_path.startswith("ssh://")
         )
+        # Enforce SSH-only for remote URLs if configured
+        if is_remote_repo and config.force_ssh_only:
+            if repository_path.startswith("http://") or repository_path.startswith("https://"):
+                result.error = "Remote repository must use SSH (git@ or ssh://)."
+                result.message = result.error
+                return result.__dict__
         
         # Initialize Git repository
         try:
@@ -208,7 +215,21 @@ def execute_git_commit_and_push(
         try:
             # Filter out CHANGELOG.md for message generation since it's auto-updated
             changes_for_message = changes.exclude_file(config.changelog_file)
-            commit_message = message_generator.generate_message(changes_for_message, repo)
+
+            commit_message = None
+            # Try AI first if enabled
+            if config.enable_ai:
+                try:
+                    ai_client = AIClient(config)
+                    prompt = _build_ai_prompt_from_changes(changes_for_message, repo)
+                    commit_message = ai_client.generate_commit_message(prompt)
+                except Exception:
+                    commit_message = None
+
+            # Fallback to heuristic generator
+            if not commit_message:
+                commit_message = message_generator.generate_message(changes_for_message, repo)
+
             result.commit_message = commit_message
         except Exception as e:
             result.error = f"Failed to generate commit message: {str(e)}"
@@ -454,6 +475,147 @@ def git_commit_and_push(
     return execute_git_commit_and_push(repository_path, confirm_push)
 
 
+def _is_remote_url(path: str) -> bool:
+    return (
+        path.startswith("http://") or
+        path.startswith("https://") or
+        path.startswith("git@") or
+        path.startswith("ssh://")
+    )
+
+
+def _build_ai_prompt_from_changes(changes, repo: Repo, max_files: int = 20) -> str:
+    total = changes.total_files()
+    parts = [
+        "Generate a high-quality Conventional Commit message for these changes.",
+        "- Follow types: feat, fix, docs, style, refactor, test, chore",
+        "- Keep subject <= 72 chars, imperative",
+        f"- Total files changed: {total}",
+    ]
+    if changes.added:
+        parts.append("Added:" )
+        for f in changes.added[:max_files]:
+            parts.append(f"  - {f}")
+    if changes.deleted:
+        parts.append("Deleted:")
+        for f in changes.deleted[:max_files]:
+            parts.append(f"  - {f}")
+    if changes.renamed:
+        parts.append("Renamed:")
+        for old, new in changes.renamed[:max_files]:
+            parts.append(f"  - {old} -> {new}")
+    if changes.modified:
+        parts.append("Modified:")
+        for f in changes.modified[:max_files]:
+            parts.append(f"  - {f}")
+    return "\n".join(parts)
+
+
+def execute_generate_commit_message(
+    repository_path: str = "."
+) -> dict:
+    """Core implementation to generate a Conventional Commit message using AI or fallback.
+
+    This function mirrors the MCP tool behavior but can be called directly from Python.
+
+    Returns:
+        { success, commit_message, files_changed, message, error?, ai_error? }
+    """
+    result = {
+        "success": False,
+        "commit_message": None,
+        "files_changed": 0,
+        "message": "",
+        "error": None,
+    }
+
+    try:
+        # Enforce SSH-only for remote URLs
+        if _is_remote_url(repository_path):
+            if repository_path.startswith("http://") or repository_path.startswith("https://"):
+                err = "Remote repository must use SSH (git@ or ssh://)."
+                result["error"] = err
+                result["message"] = err
+                return result
+
+        # Access repository
+        if _is_remote_url(repository_path):
+            repo_manager = get_repository_manager()
+            credentials = None
+            # If SSH key is configured, use it; otherwise rely on agent
+            if config.ssh_key_path:
+                credentials = GitCredentials(auth_type="ssh", ssh_key=config.ssh_key_path)
+            repo = repo_manager.get_or_clone_repository(repository_path, credentials)
+            repo_path = Path(repo.working_dir)
+        else:
+            repo_path = Path(repository_path).resolve()
+            repo_manager = get_repository_manager()
+            repo = repo_manager.get_local_repository(str(repo_path))
+
+        # Track changes
+        change_tracker = ChangeTracker()
+        changes = change_tracker.get_changes(repo)
+        if changes.is_empty():
+            result.update({
+                "success": True,
+                "files_changed": 0,
+                "message": "No changes to generate a message for",
+                "commit_message": None,
+            })
+            return result
+
+        result["files_changed"] = changes.total_files()
+
+        # Try AI first
+        commit_message = None
+        ai_error = None
+        if config.enable_ai:
+            try:
+                ai_client = AIClient(config)
+                prompt = _build_ai_prompt_from_changes(changes, repo)
+                commit_message = ai_client.generate_commit_message(prompt)
+            except Exception as e:
+                ai_error = str(e)
+
+        # Fallback to heuristic
+        if not commit_message:
+            generator = CommitMessageGenerator(
+                max_bullet_points=config.max_bullet_points,
+                max_summary_lines=config.max_summary_lines,
+            )
+            commit_message = generator.generate_message(changes, repo)
+
+        result.update({
+            "success": True,
+            "commit_message": commit_message,
+            "message": "Generated commit message" + (" with AI" if ai_error is None and config.enable_ai else " (fallback)"),
+        })
+        if ai_error:
+            result["ai_error"] = ai_error
+        return result
+    except Exception as e:
+        result["error"] = str(e)
+        result["message"] = str(e)
+        return result
+
+
+@mcp.tool()
+def generate_commit_message(
+    repository_path: str = "."
+) -> dict:
+    """
+    Analyze changes and generate a Conventional Commit message using AI.
+
+    - For remote repositories, only SSH URLs are allowed.
+    - Uses OpenAI gpt-4o-mini (configurable) when ENABLE_AI=true.
+    - Falls back to heuristic generator on failure or when AI is disabled.
+    
+    Returns:
+        { success, commit_message, files_changed, message, error? }
+    """
+    return execute_generate_commit_message(repository_path)
+
+
 def run_stdio_server() -> None:
     """Run the MCP server in stdio mode.
     
@@ -462,3 +624,15 @@ def run_stdio_server() -> None:
     AI assistants that support MCP.
     """
     mcp.run(transport="stdio")
+
+
+if __name__ == "__main__":
+    # When launched as a module (python -m git_commit_mcp.server), start stdio server
+    # Configure basic logging (plain text) to avoid interfering with MCP stdio
+    try:
+        cfg = ServerConfig.from_env()
+        setup_logging(log_level=cfg.log_level, use_json=False, log_file=None, stream="stderr")
+    except Exception:
+        # Fallback to default logging if env config fails
+        setup_logging(log_level="INFO", use_json=False, log_file=None, stream="stderr")
+    run_stdio_server()

@@ -96,7 +96,8 @@ class RequestIDFilter(logging.Filter):
 def setup_logging(
     log_level: str = "INFO",
     use_json: bool = True,
-    log_file: Optional[str] = None
+    log_file: Optional[str] = None,
+    stream: str = "stdout",
 ) -> None:
     """Configure logging for the application.
     
@@ -116,7 +117,8 @@ def setup_logging(
     root_logger.handlers.clear()
     
     # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    console_stream = sys.stdout if stream == "stdout" else sys.stderr
+    console_handler = logging.StreamHandler(console_stream)
     console_handler.setLevel(getattr(logging, log_level.upper()))
     
     # Set formatter

@@ -29,6 +29,38 @@ MANIFEST
 # PyInstaller
 *.manifest
 *.spec
+```ignore
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
 
 # Installer logs
 pip-log.txt
@@ -150,3 +182,22 @@ Thumbs.db
 *.db
 *.sqlite
 .kiro/settings/mcp.json
+
+# Local environment variants and secret files (prevent accidental commits)
+.env.local
+.env.*
+.env.*.local
+.envrc
+secrets.env
+credentials.json
+
+# Private keys and certs
+*.pem
+*.key
+*.p12
+*.asc
+
+# Kiro client user settings (keep workspace specs and steering checked in)
+.kiro/settings/*
+
+``` 
