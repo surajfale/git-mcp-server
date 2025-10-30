@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-29 23:53:43 - 1b60fc2 [LOCAL]
+### 2025-10-30 00:07:17 - b3d6282 [LOCAL]
+
+feat(docs): enhance README with installation and configuration details
+
+- Added detailed prerequisites and installation options
+- Improved quick start and configuration sections
+- Updated version in pyproject.toml to 0.1.1### 2025-10-29 23:53:43 - 1b60fc2 [PUSHED]
 
 feat(docs): enhance usage documentation and add publishing scripts
 
