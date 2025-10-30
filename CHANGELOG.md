@@ -4,7 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-29 23:05:32 - e4fe7ed [LOCAL]
+### 2025-10-29 23:53:43 - 1b60fc2 [LOCAL]
+
+feat(docs): enhance usage documentation and add publishing scripts
+
+- Added PowerShell scripts for publishing to PyPI and TestPyPI
+- Improved structure and clarity of usage documentation
+- Updated environment variable instructions for better usability
+- Enhanced AI prompt generation with additional context
+- Fixed registry URLs in dependency management files### 2025-10-29 23:05:32 - e4fe7ed [PUSHED]
 
 chore(): update project dependencies for improved stability
 

@@ -484,30 +484,72 @@ def _is_remote_url(path: str) -> bool:
     )
 
 
-def _build_ai_prompt_from_changes(changes, repo: Repo, max_files: int = 20) -> str:
+def _build_ai_prompt_from_changes(changes, repo: Repo, max_files: int = 20, max_diff_lines: int = 100) -> str:
+    """Build AI prompt with file changes and diffs for better context.
+    
+    Args:
+        changes: ChangeSet with file changes
+        repo: Git repository object
+        max_files: Maximum number of files to include
+        max_diff_lines: Maximum lines of diff to include per file
+        
+    Returns:
+        Formatted prompt string for AI
+    """
     total = changes.total_files()
     parts = [
         "Generate a high-quality Conventional Commit message for these changes.",
         "- Follow types: feat, fix, docs, style, refactor, test, chore",
         "- Keep subject <= 72 chars, imperative",
         f"- Total files changed: {total}",
+        "",
+        "File changes with diffs:",
     ]
+    
+    # Get diffs for modified and added files
+    try:
+        # Get the diff against HEAD
+        diffs = repo.head.commit.diff(None, create_patch=True)
+        diff_by_file = {d.a_path or d.b_path: d for d in diffs}
+    except Exception:
+        diff_by_file = {}
+    
     if changes.added:
-        parts.append("Added:" )
+        parts.append("\nAdded:")
         for f in changes.added[:max_files]:
             parts.append(f"  - {f}")
+            # Try to get diff for added file
+            if f in diff_by_file:
+                diff_text = diff_by_file[f].diff.decode('utf-8', errors='ignore') if diff_by_file[f].diff else ""
+                if diff_text:
+                    lines = diff_text.split('\n')[:max_diff_lines]
+                    parts.append("    Diff:")
+                    for line in lines:
+                        parts.append(f"    {line}")
+                        
     if changes.deleted:
-        parts.append("Deleted:")
+        parts.append("\nDeleted:")
         for f in changes.deleted[:max_files]:
             parts.append(f"  - {f}")
+            
     if changes.renamed:
-        parts.append("Renamed:")
+        parts.append("\nRenamed:")
         for old, new in changes.renamed[:max_files]:
             parts.append(f"  - {old} -> {new}")
+            
     if changes.modified:
-        parts.append("Modified:")
+        parts.append("\nModified:")
         for f in changes.modified[:max_files]:
             parts.append(f"  - {f}")
+            # Try to get diff for modified file
+            if f in diff_by_file:
+                diff_text = diff_by_file[f].diff.decode('utf-8', errors='ignore') if diff_by_file[f].diff else ""
+                if diff_text:
+                    lines = diff_text.split('\n')[:max_diff_lines]
+                    parts.append("    Diff:")
+                    for line in lines:
+                        parts.append(f"    {line}")
+                        
     return "\n".join(parts)
 
 

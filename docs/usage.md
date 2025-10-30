@@ -1,153 +1,417 @@
-## Usage — git-commit-mcp-server
+# Usage — git-commit-mcp-server
 
 This page covers setup, configuration, and common usage patterns for running the MCP server locally or in production.
 
-Prerequisites
+## Prerequisites
+
 - Python 3.10+
 - Git installed and configured
-- (Optional) `uv` / `uvx` for convenient distribution and execution
+- `uv` for package management (recommended)
+- `pipx` for global installation (recommended)
 
-Env vars (important)
-- `OPENAI_API_KEY` — required when `ENABLE_AI=true` (used by `AIClient`). The server reads this environment variable at process startup.
-- `ENABLE_AI` — `true`/`false` to enable AI generation
-- `AI_PROVIDER`, `AI_MODEL`, `AI_BASE_URL`, `AI_TEMPERATURE`, `AI_MAX_TOKENS` — AI-related overrides
-- `WORKSPACE_DIR` — where remote repositories are cloned
-- `FORCE_SSH_ONLY` — when `true`, remote HTTPS URLs are rejected; defaults to `true` in config
+## Installation
 
-Setting the OpenAI key (PowerShell)
+### Option 1: Global Installation with pipx (Recommended)
 
-Set it for the current session (temporary):
+Install the package globally so it's available from any directory:
 
+**From PyPI (Production):**
 ```powershell
-$env:OPENAI_API_KEY = 'sk-REPLACE'
+pipx install git-commit-mcp-server
 ```
 
-Make it persistent (user-level):
-
+**From TestPyPI (Testing):**
 ```powershell
-setx OPENAI_API_KEY "sk-REPLACE"
-# restart shells to pick up the value
+pipx install git-commit-mcp-server --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/"
 ```
 
-Running the server
-
-- Production via uvx (recommended):
-
+**Verify installation:**
 ```powershell
-uvx git-commit-mcp-server
+git-commit-mcp --help
 ```
 
-- Development (run from the repo root):
+### Option 2: Development Installation
+
+For local development from the repository:
 
 ```powershell
-# install dev deps first (optional)
+# Clone the repository
+git clone https://github.com/surajfale/git-mcp-server.git
+cd git-mcp-server
+
+# Install with development dependencies
 uv pip install -e ".[dev]"
-uv run python -m git_commit_mcp.server
-# or
+
+# Run directly
 python -m git_commit_mcp.__main__
 ```
 
-Configuring your MCP client (Kiro + Copilot examples)
+## Environment Variables
 
-Add the server to your Kiro workspace `.kiro/settings/mcp.json` or your global settings file. The simple production example (uvx) looks like this:
+The server uses these environment variables for configuration:
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `OPENAI_API_KEY` | Yes (if AI enabled) | - | OpenAI API key for AI-powered commit messages |
+| `ENABLE_AI` | No | `true` | Enable/disable AI message generation |
+| `AI_MODEL` | No | `gpt-4o-mini` | OpenAI model to use |
+| `FORCE_SSH_ONLY` | No | `true` | Reject HTTPS Git URLs, require SSH |
+| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+### Setting Environment Variables
+
+**PowerShell (Current Session):**
+```powershell
+$env:OPENAI_API_KEY = 'sk-your-key-here'
+$env:ENABLE_AI = 'true'
+$env:AI_MODEL = 'gpt-4o-mini'
+```
+
+**PowerShell (Persistent):**
+```powershell
+setx OPENAI_API_KEY "sk-your-key-here"
+# Restart your terminal for changes to take effect
+```
+
+**Using .env file:**
+```powershell
+# Copy the example file
+Copy-Item .env.example .env
+
+# Edit with your values
+notepad .env
+```
+
+## MCP Client Configuration
+
+### Kiro IDE Configuration
+
+Add the server to your MCP configuration file:
+
+**Location:**
+- Workspace: `.kiro/settings/mcp.json`
+- Global: `~/.kiro/settings/mcp.json` (or `C:\Users\<username>\.kiro\settings\mcp.json` on Windows)
+
+**Configuration (After Global Installation):**
 
 ```json
 {
   "mcpServers": {
     "git-commit": {
-      "command": "uvx",
-      "args": ["git-commit-mcp-server"],
+      "command": "git-commit-mcp",
+      "args": [],
       "disabled": false,
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini",
+        "FORCE_SSH_ONLY": "true"
+      },
       "autoApprove": []
     }
   }
 }
 ```
 
-If your Kiro/Copilot integration supports passing environment variables or an env-file to the launched MCP server, prefer injecting `OPENAI_API_KEY` there so the server process can read it at startup. Example (client-supported `env` key — client schema varies):
+**Configuration (Development Mode):**
+
+For local development, point to your repository:
 
 ```json
 {
   "mcpServers": {
     "git-commit": {
-      "command": "uvx",
-      "args": ["git-commit-mcp-server"],
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "C:\\path\\to\\git-commit-mcp-server",
+        "python",
+        "-m",
+        "git_commit_mcp.__main__"
+      ],
       "disabled": false,
-      "autoApprove": [],
       "env": {
-        "OPENAI_API_KEY": "sk-REPLACE"
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
+      },
+      "autoApprove": []
+    }
+  }
+}
+```
+
+### Claude Desktop Configuration
+
+Add to `claude_desktop_config.json`:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "git-commit": {
+      "command": "git-commit-mcp",
+      "args": [],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
       }
     }
   }
 }
 ```
 
-Alternate approach: point the client to an env-file (if supported) so secrets are kept out of the repo:
+### Configuration Notes
+
+- **Environment Variables:** Pass sensitive values like `OPENAI_API_KEY` through the `env` field to keep them out of version control
+- **Auto-Approve:** Add tool names to `autoApprove` array to skip confirmation prompts (use with caution)
+- **Disabled:** Set `"disabled": true` to temporarily disable the server without removing the configuration
+- **Working Directory:** The server automatically uses the directory where your MCP client is opened
+
+## Using the MCP Tools
+
+The server provides two main tools for Git commit automation:
+
+### 1. `generate_commit_message`
+
+Generates a conventional commit message without creating a commit.
+
+**Parameters:**
+- `repository_path` (optional): Path to Git repository (default: `"."`)
+
+**Returns:**
+- `success`: Boolean indicating if message was generated
+- `commit_message`: The generated conventional commit message
+- `files_changed`: Number of files that would be committed
+- `message`: Human-readable status message
+- `error`: Error message if operation failed
+
+**Example Usage:**
+```
+User: "Generate a commit message for my changes"
+AI: [Calls generate_commit_message with repository_path="."]
+```
+
+### 2. `git_commit_and_push`
+
+Automates the complete Git workflow: detects changes, generates message, commits, and optionally pushes.
+
+**Parameters:**
+- `repository_path` (optional): Path to Git repository (default: `"."`)
+- `confirm_push` (optional): Whether to push after committing (default: `false`)
+
+**Returns:**
+- `success`: Boolean indicating if operation succeeded
+- `commit_hash`: SHA hash of the created commit
+- `commit_message`: The generated commit message
+- `files_changed`: Number of files committed
+- `pushed`: Boolean indicating if changes were pushed
+- `changelog_updated`: Boolean indicating if CHANGELOG.md was updated
+- `message`: Human-readable status message
+- `error`: Error message if operation failed
+
+**Example Interactions:**
+
+**Commit locally:**
+```
+User: "Commit my changes"
+AI: [Calls git_commit_and_push with confirm_push=false]
+AI: "Created commit abc1234: feat(auth): Add user authentication"
+```
+
+**Commit and push:**
+```
+User: "Commit and push my changes"
+AI: [Calls git_commit_and_push with confirm_push=true]
+AI: "Committed and pushed to origin/main"
+```
+
+**Different repository:**
+```
+User: "Commit changes in ~/projects/backend"
+AI: [Calls git_commit_and_push with repository_path="~/projects/backend"]
+```
+
+## Testing
+
+### Running Tests
+
+```powershell
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=git_commit_mcp
+
+# Run specific test file
+pytest tests/test_integration.py
+
+# Run with verbose output
+pytest -v
+```
+
+### Integration Tests
+
+Integration tests cover:
+- Repository cloning (SSH and HTTPS)
+- Change detection
+- AI-powered message generation
+- Commit creation
+- Changelog updates
+- Push operations
+
+See `tests/test_integration.py` for details.
+
+## Troubleshooting
+
+### Server Won't Start
+
+**Problem:** `'git-commit-mcp' is not recognized as a command`
+
+**Solution:**
+```powershell
+# Verify installation
+pipx list
+
+# Reinstall if needed
+pipx install git-commit-mcp-server
+
+# Check PATH
+where.exe git-commit-mcp
+```
+
+### OpenAI API Key Issues
+
+**Problem:** "OPENAI_API_KEY is not set" error
+
+**Solution:**
+1. Set the environment variable in your MCP config's `env` field
+2. Or set it globally:
+   ```powershell
+   setx OPENAI_API_KEY "sk-your-key-here"
+   ```
+3. Restart your MCP client after setting the variable
+
+### Git Repository Errors
+
+**Problem:** "Not a git repository" error
+
+**Solution:**
+- Ensure you're in a Git repository directory
+- Initialize Git if needed: `git init`
+- Check that `.git` directory exists: `ls -la .git`
+
+### Authentication Errors
+
+**Problem:** Push fails with "authentication failed"
+
+**Solution:**
+1. **For SSH:** Set up SSH keys
+   ```powershell
+   ssh-keygen -t ed25519 -C "your.email@example.com"
+   # Add public key to GitHub/GitLab
+   ```
+
+2. **For HTTPS:** Configure Git credentials
+   ```powershell
+   git config --global credential.helper wincred  # Windows
+   git config --global credential.helper osxkeychain  # macOS
+   ```
+
+3. **Force SSH only:** Set `FORCE_SSH_ONLY=true` in your MCP config
+
+### Changelog Issues
+
+**Problem:** Changelog update fails
+
+**Solution:**
+- Changelog failures are non-fatal - commits still succeed
+- Check file permissions: `ls -la CHANGELOG.md`
+- Ensure write access to the repository directory
+
+### Working Directory Issues
+
+**Problem:** Server operates on wrong repository
+
+**Solution:**
+- The server uses the directory where your MCP client is opened
+- For development mode, ensure `--directory` points to the correct path
+- For global installation, open your MCP client in the desired project directory
+
+## Updating the Package
+
+### Update from PyPI
+
+```powershell
+pipx upgrade git-commit-mcp-server
+```
+
+### Update from TestPyPI
+
+```powershell
+pipx upgrade git-commit-mcp-server --index-url https://test.pypi.org/simple/ --pip-args="--extra-index-url https://pypi.org/simple/"
+```
+
+### Uninstall
+
+```powershell
+pipx uninstall git-commit-mcp-server
+```
+
+## Advanced Configuration
+
+### Custom AI Models
+
+You can use different OpenAI models by setting the `AI_MODEL` environment variable:
 
 ```json
 {
-  "mcpServers": {
-    "git-commit": {
-      "command": "uvx",
-      "args": ["git-commit-mcp-server"],
-      "disabled": false,
-      "autoApprove": [],
-      "envFile": ".env"
-    }
+  "env": {
+    "OPENAI_API_KEY": "sk-your-key-here",
+    "AI_MODEL": "gpt-4"
   }
 }
 ```
 
-Notes:
-- `.kiro/settings/mcp.json` configures the client, not the server process environment by default — verify your client supports `env`/`envFile` fields before relying on them.
-- If the client does not support env injection, start the server from a shell that has `$env:OPENAI_API_KEY` set, or use a separate process manager that injects the variable.
+Supported models:
+- `gpt-4o-mini` (default, cost-effective)
+- `gpt-4o` (more capable)
+- `gpt-4-turbo`
+- `gpt-3.5-turbo`
 
-Use the provided `.env.example` as a starting point
+### Disable AI Generation
 
-This repository includes a `.env.example` at the project root with common settings. Do not commit real secrets — copy the file to an untracked `.env` and edit values, or point your MCP client at the example for local testing.
+To use heuristic-based commit messages instead of AI:
 
-Example steps (PowerShell):
-
-```powershell
-# Copy example to local .env (one-time)
-Copy-Item .env.example .env
-# Edit the .env file in a safe location and set your real OPENAI_API_KEY
-notepad .env
+```json
+{
+  "env": {
+    "ENABLE_AI": "false"
+  }
+}
 ```
 
-Contents of `.env.example` (keys shown):
+### Custom Workspace Directory
 
-```
-OPENAI_API_KEY=sk-REPLACE
-ENABLE_AI=true
-AI_PROVIDER=openai
-AI_MODEL=gpt-4o-mini
-WORKSPACE_DIR=/tmp/git-workspaces
-FORCE_SSH_ONLY=true
-```
+For remote repository cloning:
 
-Generating messages and committing
-
-- Generate only a commit message (no commit): call the MCP tool `generate_commit_message` with `repository_path` (defaults to `.`).
-- Commit (local) with generated message: call `git_commit_and_push` with `repository_path` (defaults to `.`) and `confirm_push=false`.
-- Commit and push: call `git_commit_and_push` with `confirm_push=true` (the tool will push the current branch to the default remote).
-
-Testing
-
-- Run unit tests:
-
-```powershell
-pytest
+```json
+{
+  "env": {
+    "WORKSPACE_DIR": "/custom/path/to/workspaces"
+  }
+}
 ```
 
-- Integration tests cover cloning, message generation, changelog updates. Inspect `tests/test_integration.py`.
+## Best Practices
 
-Troubleshooting
-
-- "OPENAI_API_KEY is not set": start the server from a shell where `$env:OPENAI_API_KEY` is set.
-- "Not a git repository": ensure `repository_path` points to a Git repo or pass an SSH remote URL (if `FORCE_SSH_ONLY=true`).
-- Changelog write failures are non-fatal — commits will still be created.
-
-Advanced: Loading .env automatically
-
-`ServerConfig.from_env()` supports loading a `.env` file if you modify the invocation to pass `env_file` (or install `python-dotenv` and update `src/git_commit_mcp/__main__.py` to call `ServerConfig.from_env(env_file='.env')`). This repository does not auto-load `.env` by default to avoid surprising behavior in production.
+1. **Keep API Keys Secure:** Never commit API keys to version control
+2. **Use Environment Variables:** Pass sensitive data through the `env` field in MCP config
+3. **Test Before Pushing:** Review generated commit messages before pushing
+4. **Commit Frequently:** Make small, focused commits for better AI-generated messages
+5. **Review Changelog:** Periodically check CHANGELOG.md for accuracy
+6. **Use SSH for Git:** More secure than HTTPS, set `FORCE_SSH_ONLY=true`
