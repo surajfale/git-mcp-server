@@ -165,6 +165,156 @@ Add to `claude_desktop_config.json`:
 }
 ```
 
+### Cursor IDE Configuration
+
+Cursor IDE has specific requirements for MCP server configuration. Follow these steps carefully:
+
+**Configuration File Location:**
+
+Cursor uses a global MCP configuration file:
+- **Windows:** `%APPDATA%\Cursor\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- **macOS:** `~/Library/Application Support/Cursor/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- **Linux:** `~/.config/Cursor/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+**Configuration (After Global Installation with pipx):**
+
+```json
+{
+  "mcpServers": {
+    "git-commit-mcp": {
+      "command": "git-commit-mcp",
+      "args": [],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini",
+        "FORCE_SSH_ONLY": "true"
+      }
+    }
+  }
+}
+```
+
+**Configuration (Local Development Mode - Windows):**
+
+For local development on Windows, use absolute paths with proper escaping:
+
+**Option 1: Using venv's Python executable directly:**
+
+```json
+{
+  "mcpServers": {
+    "git-commit-mcp": {
+      "command": "C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m",
+        "git_commit_mcp.__main__"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+**Option 2: Using venv's installed script executable (Recommended if available):**
+
+If you've installed the package in your venv, you can use the script directly:
+
+```json
+{
+  "mcpServers": {
+    "git-commit-mcp": {
+      "command": "C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message\\.venv\\Scripts\\git-commit-mcp.exe",
+      "args": [],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+**Option 3: Using python command with cwd (if venv is activated in PATH):**
+
+```json
+{
+  "mcpServers": {
+    "git-commit-mcp": {
+      "command": "python",
+      "args": [
+        "-m",
+        "git_commit_mcp.__main__"
+      ],
+      "cwd": "C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message",
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+**Alternative Configuration (Using uv on Windows):**
+
+If you're using `uv` for development:
+
+```json
+{
+  "mcpServers": {
+    "git-commit-mcp": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message",
+        "python",
+        "-m",
+        "git_commit_mcp.__main__"
+      ],
+      "env": {
+        "OPENAI_API_KEY": "sk-your-key-here",
+        "ENABLE_AI": "true",
+        "AI_MODEL": "gpt-4o-mini"
+      }
+    }
+  }
+}
+```
+
+**Important Notes for Cursor:**
+
+1. **Server Name Caching:** Cursor caches MCP server names. If you see errors even after fixing configuration:
+   - Try renaming the server to a unique name (e.g., `git-commit-mcp-v2`)
+   - Restart Cursor completely
+   - Clear Cursor's cache if needed
+
+2. **Windows Path Handling:**
+   - Use double backslashes (`\\`) or forward slashes (`/`) in paths
+   - Use absolute paths when possible
+   - Ensure Python is in your system PATH
+
+3. **Verification Steps:**
+   ```powershell
+   # Test if the command works from terminal
+   git-commit-mcp --help
+   
+   # Or for development mode
+   python -m git_commit_mcp.__main__
+   ```
+
+4. **Common Issues:**
+   - If Cursor shows a red status indicator, check the Cursor output panel for detailed error messages
+   - Ensure Python executable is accessible (use full path if needed: `C:\\Python\\python.exe`)
+   - Verify environment variables are set correctly in the `env` section
+
 ### Configuration Notes
 
 - **Environment Variables:** Pass sensitive values like `OPENAI_API_KEY` through the `env` field to keep them out of version control
@@ -341,6 +491,97 @@ where.exe git-commit-mcp
 - The server uses the directory where your MCP client is opened
 - For development mode, ensure `--directory` points to the correct path
 - For global installation, open your MCP client in the desired project directory
+
+### Cursor IDE Specific Issues
+
+**Problem:** MCP server shows red status or errors in Cursor but works in other IDEs
+
+**Solution Steps:**
+
+1. **Verify Configuration File Location:**
+   ```powershell
+   # Windows - check if file exists
+   Test-Path "$env:APPDATA\Cursor\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json"
+   
+   # If it doesn't exist, create the directory structure
+   New-Item -ItemType Directory -Force -Path "$env:APPDATA\Cursor\User\globalStorage\saoudrizwan.claude-dev\settings"
+   ```
+
+2. **Check Configuration JSON Syntax:**
+   - Ensure JSON is valid (no trailing commas, proper quotes)
+   - Use a JSON validator if needed
+   - Windows paths must use double backslashes: `C:\\Users\\...`
+
+3. **Clear Cursor's Server Name Cache:**
+   - Close Cursor completely
+   - Rename your server to a unique name (e.g., `git-commit-mcp-local` instead of `git-commit-mcp`)
+   - Restart Cursor
+   - The cache issue is a known Cursor limitation
+
+4. **Use Full Python Path (Windows):**
+   If `python` command isn't found, use the full path:
+   ```json
+   {
+     "mcpServers": {
+       "git-commit-mcp": {
+         "command": "C:\\Python\\python.exe",
+         "args": ["-m", "git_commit_mcp.__main__"],
+         "cwd": "C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message"
+       }
+     }
+   }
+   ```
+
+5. **Check Cursor Output Panel:**
+   - Open Cursor's Output panel (View → Output)
+   - Select "MCP" or "Claude Dev" from the dropdown
+   - Look for detailed error messages
+   - Common errors include:
+     - "Command not found" → Check PATH or use full path
+     - "Module not found" → Ensure dependencies are installed
+     - "Permission denied" → Check file permissions
+
+6. **Test Command Manually:**
+   ```powershell
+   # Test the exact command Cursor will run
+   cd C:\Users\suraj\MyWork\mcp_servers\git_commit_message
+   python -m git_commit_mcp.__main__
+   
+   # Or if using pipx
+   git-commit-mcp
+   ```
+
+7. **Alternative: Use pipx Installation:**
+   If local development mode doesn't work, install globally with pipx:
+   ```powershell
+   pipx install git-commit-mcp-server
+   ```
+   Then use the simpler configuration:
+   ```json
+   {
+     "mcpServers": {
+       "git-commit-mcp": {
+         "command": "git-commit-mcp",
+         "args": []
+       }
+     }
+   }
+   ```
+
+**Problem:** Server works in terminal but not in Cursor
+
+**Solution:**
+- Cursor may use a different PATH environment variable
+- Check Cursor's environment: Add `"env": {"PATH": "C:\\Python;C:\\Python\\Scripts;%PATH%"}` to your config
+- Or use absolute paths for all executables
+
+**Problem:** Configuration file not found or not being read
+
+**Solution:**
+- Ensure the file is named exactly: `cline_mcp_settings.json`
+- Check file permissions (should be readable)
+- Try creating the file manually if it doesn't exist
+- Restart Cursor after creating/modifying the file
 
 ## Updating the Package
 

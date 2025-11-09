@@ -61,7 +61,14 @@ python -m git_commit_mcp.__main__
 
 ### MCP Client Setup
 
-Add to your MCP configuration file (`.kiro/settings/mcp.json` or `~/.kiro/settings/mcp.json`):
+The server works with various MCP-compatible clients including:
+- **Kiro IDE** — `.kiro/settings/mcp.json` or `~/.kiro/settings/mcp.json`
+- **Cursor IDE** — See [Cursor Configuration](#cursor-ide-configuration) below
+- **Claude Desktop** — `claude_desktop_config.json`
+- **WARP** — MCP configuration file
+- **VSCode** — With MCP extension
+
+**Example configuration (Kiro IDE):**
 
 ```json
 {
@@ -101,6 +108,51 @@ $env:OPENAI_API_KEY = 'sk-your-key-here'
 # Persistent (user-level)
 setx OPENAI_API_KEY "sk-your-key-here"
 ```
+
+### Cursor IDE Configuration
+
+**Important:** Cursor IDE has specific requirements. See the [detailed Cursor setup guide](docs/usage.md#cursor-ide-configuration) in `docs/usage.md`.
+
+**Quick setup for Cursor:**
+
+1. **Configuration file location (Windows):**
+   ```
+   %APPDATA%\Cursor\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json
+   ```
+
+2. **Basic configuration:**
+   ```json
+   {
+     "mcpServers": {
+       "git-commit-mcp": {
+         "command": "git-commit-mcp",
+         "args": [],
+         "env": {
+           "OPENAI_API_KEY": "sk-your-key-here",
+           "ENABLE_AI": "true"
+         }
+       }
+     }
+   }
+   ```
+
+3. **For local development:**
+   ```json
+   {
+     "mcpServers": {
+       "git-commit-mcp": {
+         "command": "python",
+         "args": ["-m", "git_commit_mcp.__main__"],
+         "cwd": "C:\\path\\to\\git_commit_message",
+         "env": {
+           "OPENAI_API_KEY": "sk-your-key-here"
+         }
+       }
+     }
+   }
+   ```
+
+**Troubleshooting:** If you encounter issues in Cursor, see the [Cursor-specific troubleshooting section](docs/usage.md#cursor-ide-specific-issues) in `docs/usage.md`.
 
 ## Usage
 

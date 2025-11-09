@@ -36,10 +36,12 @@ def main():
         config = ServerConfig.from_env()
         
         # Setup logging (plain text for stdio to avoid interfering with MCP protocol)
+        # IMPORTANT: Use stderr for logs so stdout is reserved for MCP protocol JSON
         setup_logging(
             log_level=config.log_level,
             use_json=False,
-            log_file=None
+            log_file=None,
+            stream="stderr"
         )
         
         logger.info(

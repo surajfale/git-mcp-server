@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-10-30 22:38:03 - 4450bf5 [LOCAL]
+### 2025-11-08 23:15:29 - 1571a5c [LOCAL]
+
+feat(docs): add Cursor IDE setup guide and update README
+
+- Introduced detailed Cursor IDE configuration instructions.
+- Updated README with MCP-compatible clients and example configurations.
+- Added troubleshooting section for Cursor IDE issues.### 2025-10-30 22:38:03 - 4450bf5 [PUSHED]
 
 chore(): update project dependencies for improved stability
 
