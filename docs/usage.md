@@ -262,6 +262,8 @@ If you've installed the package in your venv, you can use the script directly:
 }
 ```
 
+**Note:** The `cwd` field is optional but recommended for local development. When using pipx installations across multiple projects, you can omit `cwd` - the server will automatically search for git repositories by walking up the directory tree from the current working directory. However, if Cursor doesn't set the working directory correctly, you may need to specify `cwd` or use absolute paths when calling the tools.
+
 **Alternative Configuration (Using uv on Windows):**
 
 If you're using `uv` for development:

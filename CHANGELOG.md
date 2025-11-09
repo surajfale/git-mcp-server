@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-11-08 23:15:29 - 1571a5c [LOCAL]
+### 2025-11-08 23:19:04 - 2cb47a7 [LOCAL]
+
+feat(docs): enhance documentation for git repository handling
+
+- Clarified usage of `cwd` in setup instructions
+- Added notes on finding git repositories in the directory tree
+- Introduced a new function to locate git repositories in the codebase### 2025-11-08 23:15:29 - 1571a5c [PUSHED]
 
 feat(docs): add Cursor IDE setup guide and update README
 

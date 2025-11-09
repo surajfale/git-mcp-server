@@ -127,10 +127,11 @@ If your venv is activated or Python is in PATH:
 }
 ```
 
-**Important:** 
+**Important Notes:** 
 - Replace `C:\\Users\\suraj\\MyWork\\mcp_servers\\git_commit_message` with your actual project path
 - Replace `.venv` with your venv folder name if different (e.g., `venv`, `env`)
 - Option B1 is recommended as it uses the venv's installed script directly
+- **For pipx installations:** The `cwd` field is optional. The server will automatically search for git repositories by walking up the directory tree. However, if you're working with multiple projects, you may want to set `cwd` to ensure it uses the correct workspace, or use absolute paths when calling the tools.
 
 #### Option C: Using uv (Windows)
 

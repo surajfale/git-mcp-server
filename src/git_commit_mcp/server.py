@@ -36,6 +36,29 @@ config = ServerConfig.from_env()
 _repo_manager: Optional[RepositoryManager] = None
 
 
+def find_git_repository(start_path: str) -> Optional[Path]:
+    """Find the nearest git repository by walking up the directory tree.
+    
+    This function searches for a .git directory starting from the given path
+    and walking up to the filesystem root, similar to how git itself works.
+    
+    Args:
+        start_path: Starting directory path to search from
+        
+    Returns:
+        Path to the git repository root, or None if not found
+    """
+    current = Path(start_path).resolve()
+    
+    # Walk up the directory tree
+    for path in [current] + list(current.parents):
+        git_dir = path / ".git"
+        if git_dir.exists() and (git_dir.is_dir() or git_dir.is_file()):
+            return path
+    
+    return None
+
+
 def get_repository_manager() -> RepositoryManager:
     """Get or create the global repository manager instance.
     
@@ -161,7 +184,22 @@ def execute_git_commit_and_push(
                 )
             else:
                 # Handle local repository path
-                repo_path = Path(repository_path).resolve()
+                # If path is ".", try to find git repo by walking up directory tree
+                if repository_path == ".":
+                    # Try to find git repo from current working directory
+                    cwd = Path.cwd()
+                    found_repo = find_git_repository(str(cwd))
+                    if found_repo:
+                        repo_path = found_repo
+                        logger.info(
+                            "Found git repository by walking up directory tree",
+                            extra={"found_path": str(repo_path), "started_from": str(cwd)}
+                        )
+                    else:
+                        # Fallback to resolving "." normally
+                        repo_path = Path(repository_path).resolve()
+                else:
+                    repo_path = Path(repository_path).resolve()
                 
                 if not repo_path.exists():
                     result.error = f"Repository path does not exist: {repository_path}"
@@ -590,7 +628,16 @@ def execute_generate_commit_message(
             repo = repo_manager.get_or_clone_repository(repository_path, credentials)
             repo_path = Path(repo.working_dir)
         else:
-            repo_path = Path(repository_path).resolve()
+            # If path is ".", try to find git repo by walking up directory tree
+            if repository_path == ".":
+                cwd = Path.cwd()
+                found_repo = find_git_repository(str(cwd))
+                if found_repo:
+                    repo_path = found_repo
+                else:
+                    repo_path = Path(repository_path).resolve()
+            else:
+                repo_path = Path(repository_path).resolve()
             repo_manager = get_repository_manager()
             repo = repo_manager.get_local_repository(str(repo_path))
 
