@@ -4,7 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### 2025-11-08 23:19:04 - 2cb47a7 [LOCAL]
+### 2025-11-08 23:32:43 - e6300e5 [LOCAL]
+
+feat(pyproject): bump version to 0.1.2
+
+- Updated version in pyproject.toml
+- Prepares for next release
+- Maintains semantic versioning### 2025-11-08 23:19:04 - 2cb47a7 [PUSHED]
 
 feat(docs): enhance documentation for git repository handling
 
