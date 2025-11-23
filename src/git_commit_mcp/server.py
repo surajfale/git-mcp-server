@@ -55,6 +55,17 @@ def find_git_repository(start_path: str) -> Optional[Path]:
         git_dir = path / ".git"
         if git_dir.exists() and (git_dir.is_dir() or git_dir.is_file()):
             return path
+            
+    # Fallback: Try asking git directly (useful for worktrees or odd setups)
+    try:
+        # Run git rev-parse --show-toplevel
+        from git import Git
+        g = Git(str(current))
+        toplevel = g.rev_parse("--show-toplevel")
+        if toplevel:
+            return Path(toplevel).resolve()
+    except Exception:
+        pass
     
     return None
 
@@ -210,7 +221,7 @@ def execute_git_commit_and_push(
                 repo = repo_manager.get_local_repository(str(repo_path))
                 
         except InvalidGitRepositoryError as e:
-            result.error = f"Not a git repository: {repository_path}"
+            result.error = f"Not a git repository: {repository_path} (resolved to {repo_path}). Current working directory: {Path.cwd()}"
             result.message = result.error
             return result.__dict__
         except GitCommandError as e:
